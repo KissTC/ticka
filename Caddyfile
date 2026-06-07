@@ -1,0 +1,10 @@
+api.ticka.dev {
+	reverse_proxy backend:8082
+
+	encode gzip
+
+	header {
+		# Evita que el navegador adivine el tipo de contenido
+		X-Content-Type-Options "nosniff"
+	}
+}
