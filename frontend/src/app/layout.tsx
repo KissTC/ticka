@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${outfit.variable} ${inter.variable}`}>
       <body className="antialiased">
-        <ClerkProvider>
+        <ClerkProvider afterSignOutUrl="/">
           {children}
         </ClerkProvider>
       </body>
