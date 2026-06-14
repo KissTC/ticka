@@ -416,7 +416,7 @@ export default function CreateEventPage() {
           {loading ? (
             <>
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-              {unsplashUrl ? "Creando tu contador..." : "Procesando y Subiendo a Spaces..."}
+              {unsplashUrl ? "Creando tu contador..." : "Subiendo..."}
             </>
           ) : (
             "Generar Mi Contador →"
