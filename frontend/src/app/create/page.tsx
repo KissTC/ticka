@@ -166,7 +166,13 @@ export default function CreateEventPage() {
       });
 
       if (!eventRes.ok) {
-        throw new Error("No se pudo registrar la cuenta regresiva.");
+        const err = await eventRes.json().catch(() => ({ error: "" }));
+        if (eventRes.status === 429) {
+          throw new Error(
+            err.error || "Alcanzaste el límite de contadores por hora. Espera una hora e inténtalo de nuevo."
+          );
+        }
+        throw new Error(err.error || "No se pudo registrar la cuenta regresiva.");
       }
 
       const event = await eventRes.json();
@@ -425,6 +431,14 @@ export default function CreateEventPage() {
 
         <p className="text-center text-xs text-gray-500 font-inter">
           Tu contador tendrá su propia URL para compartir en redes sociales y WhatsApp
+        </p>
+
+        <p className="text-center text-xs text-gray-600 font-inter">
+          Al crear un contador aceptas nuestros{" "}
+          <Link href="/terminos" className="text-gray-400 hover:text-gray-300 underline">
+            Términos de Uso
+          </Link>
+          .
         </p>
       </form>
     </main>

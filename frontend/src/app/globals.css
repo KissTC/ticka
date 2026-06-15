@@ -8,6 +8,7 @@
 :root {
   --background: 10 5 27; /* #0a051b */
   --foreground: 255 255 255;
+  color-scheme: dark;
 }
 
 body {
@@ -68,13 +69,13 @@ select.glass-input {
   color-scheme: dark;
 }
 .glass-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) opacity(0.5);
   cursor: pointer;
   border-radius: 4px;
   padding: 2px;
+  opacity: 0.5;
 }
 .glass-input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
-  filter: invert(1) opacity(0.8);
+  opacity: 0.8;
 }
 
 /* Efectos de neón */

@@ -79,6 +79,10 @@ export default async function HomePage() {
       {/* Footer */}
       <footer className="text-center text-gray-500 text-sm font-inter border-t border-white/5 pt-8">
         &copy; {new Date().getFullYear()} ticka. Todos los derechos reservados.
+        {" · "}
+        <Link href="/terminos" className="hover:text-gray-300 transition-colors">
+          Términos de Uso
+        </Link>
       </footer>
     </main>
   );

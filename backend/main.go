@@ -77,7 +77,7 @@ func main() {
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "Límite alcanzado: máximo 5 contadores por hora por IP.",
+				"error": "Alcanzaste el límite de 5 contadores por hora desde tu conexión. Espera una hora e inténtalo de nuevo.",
 			})
 		},
 	})

@@ -44,7 +44,7 @@ func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
 		SELECT c.id, c.slug, c.name, c.description, c.cover_image_url, c.created_at,
 		       COUNT(e.id) AS event_count
 		FROM categories c
-		LEFT JOIN events e ON e.category_id = c.id
+		LEFT JOIN events e ON e.category_id = c.id AND e.is_visible = true AND e.target_date > NOW()
 		GROUP BY c.id
 		ORDER BY c.created_at DESC
 	`)
@@ -75,7 +75,7 @@ func (h *CategoryHandler) GetCategoryBySlug(c *fiber.Ctx) error {
 		SELECT c.id, c.slug, c.name, c.description, c.cover_image_url, c.created_at,
 		       COUNT(e.id) AS event_count
 		FROM categories c
-		LEFT JOIN events e ON e.category_id = c.id
+		LEFT JOIN events e ON e.category_id = c.id AND e.is_visible = true AND e.target_date > NOW()
 		WHERE c.slug = $1
 		GROUP BY c.id
 	`, slug).Scan(&cat.ID, &cat.Slug, &cat.Name, &cat.Description,
@@ -93,7 +93,7 @@ func (h *CategoryHandler) GetCategoryBySlug(c *fiber.Ctx) error {
 		       e.category_id::text, c.slug, c.name
 		FROM events e
 		INNER JOIN categories c ON e.category_id = c.id
-		WHERE c.slug = $1
+		WHERE c.slug = $1 AND e.is_visible = true AND e.target_date > NOW()
 		ORDER BY e.is_pinned DESC, e.target_date ASC
 	`, slug)
 	if err != nil {

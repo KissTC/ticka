@@ -189,15 +189,27 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	var userID *string
 	if token := strings.TrimPrefix(c.Get("Authorization"), "Bearer "); token != "" {
 		if clerkID, err := verifyClerkToken(token); err == nil {
-			var uid string
+			var uid, plan string
 			dbErr := h.DB.QueryRow(`
 				INSERT INTO users (clerk_id, email, plan)
 				VALUES ($1, '', 'free')
 				ON CONFLICT (clerk_id) DO UPDATE SET clerk_id = EXCLUDED.clerk_id
-				RETURNING id
-			`, clerkID).Scan(&uid)
+				RETURNING id, plan
+			`, clerkID).Scan(&uid, &plan)
 			if dbErr == nil {
 				userID = &uid
+
+				// Plan free: máximo 3 contadores activos por cuenta
+				if plan != "pro" {
+					var count int
+					if err := h.DB.QueryRow(
+						`SELECT COUNT(*) FROM events WHERE user_id = $1 AND is_visible = true`, uid,
+					).Scan(&count); err == nil && count >= 3 {
+						return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+							"error": "Has alcanzado el límite de 3 contadores en el plan gratuito. Elimina uno o mejora a Pro para crear más.",
+						})
+					}
+				}
 			}
 		}
 	}
@@ -245,7 +257,7 @@ func (h *EventHandler) ListPopularEvents(c *fiber.Ctx) error {
 			       e.category_id::text, c.slug, c.name
 			FROM events e
 			INNER JOIN categories c ON e.category_id = c.id
-			WHERE c.slug = $1 AND e.is_visible = true
+			WHERE c.slug = $1 AND e.is_visible = true AND e.target_date > NOW()
 			  AND e.title ILIKE $2
 			ORDER BY e.is_pinned DESC, e.views DESC, e.created_at DESC
 			LIMIT 50
@@ -258,7 +270,7 @@ func (h *EventHandler) ListPopularEvents(c *fiber.Ctx) error {
 			       e.category_id::text, c.slug, c.name
 			FROM events e
 			INNER JOIN categories c ON e.category_id = c.id
-			WHERE c.slug = $1 AND e.is_visible = true
+			WHERE c.slug = $1 AND e.is_visible = true AND e.target_date > NOW()
 			ORDER BY e.is_pinned DESC, e.views DESC, e.created_at DESC
 			LIMIT 50
 		`, categorySlug)
@@ -270,7 +282,7 @@ func (h *EventHandler) ListPopularEvents(c *fiber.Ctx) error {
 			       e.category_id::text, c.slug, c.name
 			FROM events e
 			LEFT JOIN categories c ON e.category_id = c.id
-			WHERE e.is_visible = true AND e.title ILIKE $1
+			WHERE e.is_visible = true AND e.target_date > NOW() AND e.title ILIKE $1
 			ORDER BY e.is_pinned DESC, e.views DESC, e.created_at DESC
 			LIMIT 30
 		`, "%"+query+"%")
@@ -282,7 +294,7 @@ func (h *EventHandler) ListPopularEvents(c *fiber.Ctx) error {
 			       e.category_id::text, c.slug, c.name
 			FROM events e
 			LEFT JOIN categories c ON e.category_id = c.id
-			WHERE e.is_visible = true
+			WHERE e.is_visible = true AND e.target_date > NOW()
 			ORDER BY e.is_pinned DESC, e.views DESC, e.created_at DESC
 			LIMIT 12
 		`)
