@@ -203,15 +203,15 @@ export default function UpgradePage() {
         <div className="text-center mb-8">
           <div className="flex items-end justify-center gap-1">
             <span className="text-5xl font-extrabold font-outfit text-white">
-              {billing === "monthly" ? "$4.99" : "$39.99"}
+              {billing === "monthly" ? "$95" : "$760"}
             </span>
             <span className="text-gray-400 font-inter mb-2">
-              /{billing === "monthly" ? "mes" : "año"}
+              MXN/{billing === "monthly" ? "mes" : "año"}
             </span>
           </div>
           {billing === "yearly" && (
             <p className="text-sm text-green-400 font-inter mt-1">
-              Equivale a $3.33/mes · Ahorras $19.89
+              Equivale a $63.33 MXN/mes · Ahorras $380 MXN
             </p>
           )}
         </div>

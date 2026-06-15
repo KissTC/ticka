@@ -104,7 +104,7 @@ export default async function DashboardPage() {
               🎬 Desbloquea video de fondo y más con Pro
             </p>
             <p className="text-xs text-gray-400 font-inter mt-0.5">
-              Desde $4.99/mes · Cancela cuando quieras
+              Desde $95 MXN/mes · Cancela cuando quieras
             </p>
           </div>
           <Link
