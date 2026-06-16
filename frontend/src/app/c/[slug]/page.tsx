@@ -30,6 +30,19 @@ async function getEvent(slug: string): Promise<Event | null> {
   }
 }
 
+function formatTimeRemaining(targetDate: string): string {
+  const diff = new Date(targetDate).getTime() - Date.now();
+  if (diff <= 0) return "¡Ya comenzó!";
+  const totalMinutes = Math.floor(diff / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days >= 7) return `Faltan ${days} días`;
+  if (days > 0) return `Faltan ${days}d ${hours}h`;
+  if (hours > 0) return `Faltan ${hours}h ${minutes}min`;
+  return `Faltan ${minutes}min`;
+}
+
 // 2. Inyección dinámica de etiquetas meta de Open Graph
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
@@ -40,18 +53,23 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     };
   }
 
+  const timeStr = formatTimeRemaining(event.target_date);
+  const ogTitle = `${event.title} · ${timeStr}`;
+  const ogDescription = `${timeStr} para ${event.title}. Mira la cuenta regresiva en vivo en ticka.dev`;
+
   return {
     title: `${event.title} | ticka`,
-    description: `¡Falta poco! Mira la cuenta regresiva en tiempo real para: ${event.title}.`,
+    description: ogDescription,
     openGraph: {
-      title: `${event.title} | ticka`,
-      description: `¡Falta poco! Mira la cuenta regresiva en tiempo real para: ${event.title}.`,
+      title: ogTitle,
+      description: ogDescription,
       type: "website",
       // og:image es generado automáticamente por opengraph-image.tsx
     },
     twitter: {
       card: "summary_large_image",
-      title: `${event.title} | ticka`,
+      title: ogTitle,
+      description: ogDescription,
       // twitter:image es generado automáticamente desde la og:image
     },
   };

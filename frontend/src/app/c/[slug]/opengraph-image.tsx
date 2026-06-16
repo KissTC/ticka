@@ -13,6 +13,19 @@ interface Event {
   category_name?: string;
 }
 
+function formatTimeRemaining(targetDate: string): string {
+  const diff = new Date(targetDate).getTime() - Date.now();
+  if (diff <= 0) return "¡Ya comenzó!";
+  const totalMinutes = Math.floor(diff / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days >= 7) return `Faltan ${days} días`;
+  if (days > 0) return `Faltan ${days}d ${hours}h`;
+  if (hours > 0) return `Faltan ${hours}h ${minutes}min`;
+  return `Faltan ${minutes}min`;
+}
+
 async function getEvent(slug: string): Promise<Event | null> {
   try {
     const apiURL = process.env.API_URL || "http://localhost:8082";
@@ -62,6 +75,8 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     weekday: "short", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
   });
 
+  const timeRemaining = formatTimeRemaining(event.target_date);
+
   const titleSize = event.title.length > 50 ? 54 : event.title.length > 28 ? 68 : 82;
 
   return new ImageResponse(
@@ -95,13 +110,13 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             {event.title}
           </div>
 
-          {/* Footer: fecha + CTA */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", fontSize: 26, color: "rgba(255,255,255,0.65)", fontWeight: 700 }}>
-              {`${formattedDate} · UTC`}
+          {/* Footer: tiempo restante + fecha */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", fontSize: 36, fontWeight: 800, color: "#c084fc", letterSpacing: "-0.5px" }}>
+              {timeRemaining}
             </div>
-            <div style={{ display: "flex", fontSize: 20, color: "rgba(255,255,255,0.32)", fontWeight: 400 }}>
-              ticka.gg · Ver cuenta regresiva
+            <div style={{ display: "flex", fontSize: 20, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>
+              {`${formattedDate} · ticka.dev`}
             </div>
           </div>
         </div>
