@@ -83,6 +83,10 @@ export default async function HomePage() {
         <Link href="/terminos" className="hover:text-gray-300 transition-colors">
           Términos de Uso
         </Link>
+        {" · "}
+        <Link href="/privacidad" className="hover:text-gray-300 transition-colors">
+          Aviso de Privacidad
+        </Link>
       </footer>
     </main>
   );
