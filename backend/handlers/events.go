@@ -185,6 +185,9 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		tz = "UTC"
 	}
 
+	// Capturar IP del cliente para rate-limiting de invitados
+	clientIP := c.IP()
+
 	// Asociar al usuario si viene con token Clerk válido
 	var userID *string
 	if token := strings.TrimPrefix(c.Get("Authorization"), "Bearer "); token != "" {
@@ -214,6 +217,19 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		}
 	}
 
+	// Invitados (sin cuenta): máximo 1 contador activo por IP en las últimas 24h
+	if userID == nil && clientIP != "" {
+		var guestCount int
+		if err := h.DB.QueryRow(
+			`SELECT COUNT(*) FROM events WHERE user_id IS NULL AND client_ip = $1 AND is_visible = true AND created_at > NOW() - INTERVAL '24 hours'`,
+			clientIP,
+		).Scan(&guestCount); err == nil && guestCount >= 1 {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Los visitantes pueden crear 1 contador cada 24 horas. Crea una cuenta gratis para crear más y no perderlos.",
+			})
+		}
+	}
+
 	// thumbnail_url es opcional — si no viene, se guarda como NULL y el frontend usa image_url
 	var thumbnailURL *string
 	if req.ThumbnailURL != "" {
@@ -222,9 +238,9 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 
 	var id string
 	err = h.DB.QueryRow(
-		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-		slug, req.Title, targetTime, req.ImageURL, thumbnailURL, categoryID, tz, userID,
+		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id, client_ip)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		slug, req.Title, targetTime, req.ImageURL, thumbnailURL, categoryID, tz, userID, clientIP,
 	).Scan(&id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al guardar el evento: " + err.Error()})

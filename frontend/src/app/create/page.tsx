@@ -176,7 +176,17 @@ export default function CreateEventPage() {
       }
 
       const event = await eventRes.json();
-      
+
+      // Si es invitado, guardar slug en localStorage para mostrar banner en el contador
+      if (!isSignedIn) {
+        try {
+          const prev: string[] = JSON.parse(localStorage.getItem("ticka_guest_slugs") || "[]");
+          if (!prev.includes(event.slug)) {
+            localStorage.setItem("ticka_guest_slugs", JSON.stringify([...prev, event.slug]));
+          }
+        } catch {}
+      }
+
       // 3. Redirigir al contador dinámico recién creado
       router.push(`/c/${event.slug}`);
     } catch (err: any) {

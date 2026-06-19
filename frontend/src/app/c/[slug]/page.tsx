@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import CountdownTimer from "@/components/CountdownTimer";
+import GuestBanner from "@/components/GuestBanner";
 
 interface Event {
   id: string;
@@ -162,6 +163,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           👁️ {event.views.toLocaleString()} visitas
         </div>
       </div>
+
+      <GuestBanner slug={event.slug} />
 
       {/* Footer — oculto en Pro */}
       {!isPro && (
