@@ -21,6 +21,7 @@ type CategoryResponse struct {
 	CoverImageURL string    `json:"cover_image_url"`
 	CreatedAt     time.Time `json:"created_at"`
 	EventCount    int       `json:"event_count"`
+	IsHidden      bool      `json:"is_hidden"`
 }
 
 type CategoryDetailResponse struct {
@@ -45,6 +46,7 @@ func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
 		       COUNT(e.id) AS event_count
 		FROM categories c
 		LEFT JOIN events e ON e.category_id = c.id AND e.is_visible = true AND e.target_date > NOW()
+		WHERE c.is_hidden = false
 		GROUP BY c.id
 		ORDER BY c.created_at DESC
 	`)
@@ -76,7 +78,7 @@ func (h *CategoryHandler) GetCategoryBySlug(c *fiber.Ctx) error {
 		       COUNT(e.id) AS event_count
 		FROM categories c
 		LEFT JOIN events e ON e.category_id = c.id AND e.is_visible = true AND e.target_date > NOW()
-		WHERE c.slug = $1
+		WHERE c.slug = $1 AND c.is_hidden = false
 		GROUP BY c.id
 	`, slug).Scan(&cat.ID, &cat.Slug, &cat.Name, &cat.Description,
 		&cat.CoverImageURL, &cat.CreatedAt, &cat.EventCount)
@@ -159,4 +161,81 @@ func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 		"slug": slug,
 		"name": req.Name,
 	})
+}
+
+func (h *CategoryHandler) isAdmin(c *fiber.Ctx) bool {
+	token := strings.TrimPrefix(c.Get("Authorization"), "Bearer ")
+	return h.AdminToken != "" && token == h.AdminToken
+}
+
+// GET /api/admin/categories  (solo admin) — incluye categorías ocultas
+func (h *CategoryHandler) ListAllCategories(c *fiber.Ctx) error {
+	if !h.isAdmin(c) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token de administrador inválido"})
+	}
+
+	rows, err := h.DB.Query(`
+		SELECT c.id, c.slug, c.name, c.description, c.cover_image_url, c.created_at,
+		       COUNT(e.id) AS event_count, c.is_hidden
+		FROM categories c
+		LEFT JOIN events e ON e.category_id = c.id AND e.is_visible = true AND e.target_date > NOW()
+		GROUP BY c.id
+		ORDER BY c.is_hidden ASC, c.created_at DESC
+	`)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer rows.Close()
+
+	categories := []CategoryResponse{}
+	for rows.Next() {
+		var cat CategoryResponse
+		if err := rows.Scan(&cat.ID, &cat.Slug, &cat.Name, &cat.Description,
+			&cat.CoverImageURL, &cat.CreatedAt, &cat.EventCount, &cat.IsHidden); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		categories = append(categories, cat)
+	}
+
+	return c.JSON(categories)
+}
+
+type UpdateCategoryRequest struct {
+	Name          *string `json:"name"`
+	Description   *string `json:"description"`
+	CoverImageURL *string `json:"cover_image_url"`
+	IsHidden      *bool   `json:"is_hidden"`
+}
+
+// PATCH /api/admin/categories/:slug  (solo admin) — solo actualiza los campos enviados.
+// El slug no cambia al renombrar para no romper URLs compartidas.
+func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
+	if !h.isAdmin(c) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token de administrador inválido"})
+	}
+
+	var req UpdateCategoryRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cuerpo de solicitud inválido"})
+	}
+	if req.Name != nil && strings.TrimSpace(*req.Name) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "El nombre no puede estar vacío"})
+	}
+
+	res, err := h.DB.Exec(`
+		UPDATE categories SET
+			name            = COALESCE($2, name),
+			description     = COALESCE($3, description),
+			cover_image_url = COALESCE($4, cover_image_url),
+			is_hidden       = COALESCE($5, is_hidden)
+		WHERE slug = $1
+	`, c.Params("slug"), req.Name, req.Description, req.CoverImageURL, req.IsHidden)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al actualizar categoría: " + err.Error()})
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Categoría no encontrada"})
+	}
+
+	return c.JSON(fiber.Map{"slug": c.Params("slug"), "updated": true})
 }

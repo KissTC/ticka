@@ -95,10 +95,13 @@ func main() {
 	api.Get("/categories", categoryHandler.ListCategories)
 	api.Get("/categories/:slug", categoryHandler.GetCategoryBySlug)
 	api.Post("/categories", categoryHandler.CreateCategory)
+	api.Get("/admin/categories", categoryHandler.ListAllCategories)
+	api.Patch("/admin/categories/:slug", categoryHandler.UpdateCategory)
 
 	// Usuarios autenticados
 	api.Get("/users/me", userHandler.GetMe)
 	api.Get("/users/me/events", userHandler.GetMyEvents)
+	api.Post("/users/me/claim", userHandler.ClaimGuestEvents)
 
 	// Stripe
 	api.Post("/stripe/checkout", stripeHandler.CreateCheckoutSession)

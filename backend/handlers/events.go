@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
@@ -203,19 +205,21 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 				ON CONFLICT (clerk_id) DO UPDATE SET clerk_id = EXCLUDED.clerk_id
 				RETURNING id, plan
 			`, clerkID).Scan(&uid, &plan)
-			if dbErr == nil {
-				userID = &uid
+			if dbErr != nil {
+				// No crear el contador como invitado si el usuario sí inició sesión
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al obtener tu cuenta. Intenta de nuevo."})
+			}
+			userID = &uid
 
-				// Plan free: máximo 3 contadores activos por cuenta
-				if plan != "pro" {
-					var count int
-					if err := h.DB.QueryRow(
-						`SELECT COUNT(*) FROM events WHERE user_id = $1 AND is_visible = true`, uid,
-					).Scan(&count); err == nil && count >= 3 {
-						return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-							"error": "Has alcanzado el límite de 3 contadores en el plan gratuito. Elimina uno o mejora a Pro para crear más.",
-						})
-					}
+			// Plan free: máximo 3 contadores activos por cuenta
+			if plan != "pro" {
+				var count int
+				if err := h.DB.QueryRow(
+					`SELECT COUNT(*) FROM events WHERE user_id = $1 AND is_visible = true`, uid,
+				).Scan(&count); err == nil && count >= 3 {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+						"error": "Has alcanzado el límite de 3 contadores en el plan gratuito. Elimina uno o mejora a Pro para crear más.",
+					})
 				}
 			}
 		}
@@ -253,24 +257,39 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		sourceURL = &s
 	}
 
+	// Invitados reciben un token secreto para reclamar el contador al crear su cuenta
+	var claimToken *string
+	if userID == nil {
+		buf := make([]byte, 24)
+		if _, err := rand.Read(buf); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al generar token"})
+		}
+		t := hex.EncodeToString(buf)
+		claimToken = &t
+	}
+
 	var id string
 	err = h.DB.QueryRow(
-		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id, client_ip, description, source_url)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-		slug, req.Title, targetTime, req.ImageURL, thumbnailURL, categoryID, tz, userID, clientIP, description, sourceURL,
+		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id, client_ip, description, source_url, claim_token)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+		slug, req.Title, targetTime, req.ImageURL, thumbnailURL, categoryID, tz, userID, clientIP, description, sourceURL, claimToken,
 	).Scan(&id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al guardar el evento: " + err.Error()})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+	resp := fiber.Map{
 		"id":          id,
 		"slug":        slug,
 		"title":       req.Title,
 		"target_date": targetTime,
 		"image_url":   req.ImageURL,
 		"category_id": categoryID,
-	})
+	}
+	if claimToken != nil {
+		resp["claim_token"] = *claimToken
+	}
+	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 // GET /api/events
@@ -759,7 +778,7 @@ func (h *EventHandler) SitemapData(c *fiber.Ctx) error {
 		slugs = append(slugs, e)
 	}
 
-	catRows, err := h.DB.Query(`SELECT slug FROM categories ORDER BY created_at DESC`)
+	catRows, err := h.DB.Query(`SELECT slug FROM categories WHERE is_hidden = false ORDER BY created_at DESC`)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

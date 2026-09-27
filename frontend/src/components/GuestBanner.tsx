@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@clerk/nextjs";
 
 export default function GuestBanner({ slug }: { slug: string }) {
   const [show, setShow] = useState(false);
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     try {
@@ -13,7 +15,8 @@ export default function GuestBanner({ slug }: { slug: string }) {
     } catch {}
   }, [slug]);
 
-  if (!show) return null;
+  // Con sesión iniciada, GuestClaimer asigna el contador a la cuenta
+  if (!show || isSignedIn) return null;
 
   return (
     <div className="relative z-10 w-full max-w-3xl">
@@ -22,7 +25,7 @@ export default function GuestBanner({ slug }: { slug: string }) {
           Este contador es temporal y solo visible desde este navegador.
         </p>
         <Link
-          href="/sign-up"
+          href={`/sign-up?redirect_url=${encodeURIComponent(`/c/${slug}`)}`}
           className="shrink-0 bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold font-outfit px-4 py-2 rounded-xl text-sm hover:opacity-90 transition-all"
         >
           Guardar mi contador →

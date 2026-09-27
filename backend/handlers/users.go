@@ -122,3 +122,84 @@ func (h *UserHandler) GetMyEvents(c *fiber.Ctx) error {
 
 	return c.JSON(events)
 }
+
+type ClaimRequest struct {
+	Claims []struct {
+		Slug       string `json:"slug"`
+		ClaimToken string `json:"claim_token"`
+	} `json:"claims"`
+}
+
+// POST /api/users/me/claim — asigna al usuario los contadores que creó como invitado.
+// Cada contador requiere el claim_token que se entregó al crearlo.
+func (h *UserHandler) ClaimGuestEvents(c *fiber.Ctx) error {
+	token := extractToken(c)
+	if token == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token requerido"})
+	}
+	clerkID, err := verifyClerkToken(token)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token inválido"})
+	}
+
+	var req ClaimRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cuerpo de solicitud inválido"})
+	}
+	if len(req.Claims) > 20 {
+		req.Claims = req.Claims[:20]
+	}
+
+	var userID, plan string
+	err = h.DB.QueryRow(`
+		INSERT INTO users (clerk_id, email, plan)
+		VALUES ($1, '', 'free')
+		ON CONFLICT (clerk_id) DO UPDATE SET clerk_id = EXCLUDED.clerk_id
+		RETURNING id, plan
+	`, clerkID).Scan(&userID, &plan)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al obtener usuario"})
+	}
+
+	var count int
+	if err := h.DB.QueryRow(
+		`SELECT COUNT(*) FROM events WHERE user_id = $1 AND is_visible = true`, userID,
+	).Scan(&count); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// claimed: asignados ahora. invalid: token incorrecto, ya reclamado o eliminado.
+	// over_limit: válidos pero el plan free ya tiene 3 contadores.
+	claimed, invalid, overLimit := []string{}, []string{}, []string{}
+	for _, cl := range req.Claims {
+		if cl.Slug == "" || cl.ClaimToken == "" {
+			continue
+		}
+		if plan != "pro" && count >= 3 {
+			var exists bool
+			h.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM events WHERE slug = $1 AND claim_token = $2 AND user_id IS NULL AND is_visible = true)`,
+				cl.Slug, cl.ClaimToken).Scan(&exists)
+			if exists {
+				overLimit = append(overLimit, cl.Slug)
+			} else {
+				invalid = append(invalid, cl.Slug)
+			}
+			continue
+		}
+		res, err := h.DB.Exec(`
+			UPDATE events SET user_id = $1, claim_token = NULL
+			WHERE slug = $2 AND claim_token = $3 AND user_id IS NULL AND is_visible = true
+		`, userID, cl.Slug, cl.ClaimToken)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		if n, _ := res.RowsAffected(); n == 1 {
+			claimed = append(claimed, cl.Slug)
+			count++
+		} else {
+			invalid = append(invalid, cl.Slug)
+		}
+	}
+
+	return c.JSON(fiber.Map{"claimed": claimed, "invalid": invalid, "over_limit": overLimit})
+}

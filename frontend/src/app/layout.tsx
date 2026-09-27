@@ -2,6 +2,7 @@ import {ClerkProvider} from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Outfit, Inter } from "next/font/google";
 import "./globals.css";
+import GuestClaimer from "@/components/GuestClaimer";
 
 const outfit = Outfit({ 
   subsets: ["latin"],
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="es" className={`${outfit.variable} ${inter.variable}`}>
       <body className="antialiased">
         <ClerkProvider afterSignOutUrl="/">
+          <GuestClaimer />
           {children}
         </ClerkProvider>
       </body>

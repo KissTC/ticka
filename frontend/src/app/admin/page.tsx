@@ -14,6 +14,7 @@ interface Category {
   description: string;
   cover_image_url: string;
   event_count: number;
+  is_hidden?: boolean;
 }
 
 interface Event {
@@ -201,11 +202,28 @@ function CategoriesTab({ token }: { token: string }) {
 
   const loadCategories = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/categories`);
+      // Endpoint admin: incluye categorías ocultas
+      const res = await fetch(`${API}/api/admin/categories`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       setCategories(Array.isArray(data) ? data : []);
     } catch {}
-  }, []);
+  }, [token]);
+
+  async function updateCategory(slug: string, patch: Partial<Pick<Category, "name" | "description" | "cover_image_url" | "is_hidden">>) {
+    const res = await fetch(`${API}/api/admin/categories/${slug}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(patch),
+    });
+    if (res.status === 401) throw new Error("Token inválido — cierra sesión y vuelve a entrar");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Error al actualizar la categoría");
+    }
+    setCategories((prev) => prev.map((c) => (c.slug === slug ? { ...c, ...patch } : c)));
+  }
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
@@ -315,33 +333,171 @@ function CategoriesTab({ token }: { token: string }) {
         ) : (
           <div className="flex flex-col gap-2">
             {categories.map((cat) => (
-              <div key={cat.id} className="glass-panel rounded-xl p-4 flex items-center gap-4">
-                {cat.cover_image_url ? (
-                  <div
-                    className="w-12 h-12 rounded-lg bg-cover bg-center flex-shrink-0"
-                    style={{ backgroundImage: `url(${cat.cover_image_url})` }}
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-xl flex-shrink-0">
-                    🗂️
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold font-outfit text-white truncate">{cat.name}</p>
-                  <p className="text-xs text-gray-500 font-inter">/{cat.slug} · {cat.event_count} contadores</p>
-                </div>
-                <Link
-                  href={`/categoria/${cat.slug}`}
-                  target="_blank"
-                  className="text-xs text-purple-400 hover:text-purple-300 font-outfit transition-colors flex-shrink-0"
-                >
-                  ver →
-                </Link>
-              </div>
+              <CategoryRow
+                key={cat.id}
+                cat={cat}
+                onUpdate={updateCategory}
+                onFeedback={setTimed}
+              />
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CategoryRow({
+  cat,
+  onUpdate,
+  onFeedback,
+}: {
+  cat: Category;
+  onUpdate: (slug: string, patch: Partial<Pick<Category, "name" | "description" | "cover_image_url" | "is_hidden">>) => Promise<void>;
+  onFeedback: (f: { type: "success" | "error"; msg: string } | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(cat.name);
+  const [description, setDescription] = useState(cat.description);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(cat.cover_image_url || null);
+  const [saving, setSaving] = useState(false);
+
+  function startEdit() {
+    setName(cat.name);
+    setDescription(cat.description);
+    setImageFile(null);
+    setImagePreview(cat.cover_image_url || null);
+    setEditing(true);
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const patch: Parameters<typeof onUpdate>[1] = { name: name.trim(), description: description.trim() };
+      if (imageFile) {
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        const uploadRes = await fetch(`${API}/api/upload`, { method: "POST", body: fd });
+        if (!uploadRes.ok) throw new Error("Error subiendo la imagen de portada");
+        const { url } = await uploadRes.json();
+        patch.cover_image_url = url;
+      }
+      await onUpdate(cat.slug, patch);
+      onFeedback({ type: "success", msg: `Categoría "${name.trim()}" actualizada` });
+      setEditing(false);
+    } catch (err: unknown) {
+      onFeedback({ type: "error", msg: err instanceof Error ? err.message : "Error inesperado" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleHidden() {
+    setSaving(true);
+    try {
+      await onUpdate(cat.slug, { is_hidden: !cat.is_hidden });
+      onFeedback({ type: "success", msg: `"${cat.name}" ${cat.is_hidden ? "visible de nuevo" : "oculta"}` });
+    } catch (err: unknown) {
+      onFeedback({ type: "error", msg: err instanceof Error ? err.message : "Error inesperado" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={`glass-panel rounded-xl p-4 flex flex-col gap-3 ${cat.is_hidden ? "opacity-60" : ""}`}>
+      <div className="flex items-center gap-4">
+        {cat.cover_image_url ? (
+          <div
+            className="w-12 h-12 rounded-lg bg-cover bg-center flex-shrink-0"
+            style={{ backgroundImage: `url(${cat.cover_image_url})` }}
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-xl flex-shrink-0">
+            🗂️
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold font-outfit text-white truncate">{cat.name}</p>
+            {cat.is_hidden && (
+              <span className="text-[10px] font-outfit text-gray-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                oculta
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 font-inter">/{cat.slug} · {cat.event_count} contadores</p>
+          {!editing && (
+            <p className="text-xs text-gray-400 font-inter truncate mt-0.5">
+              {cat.description || <span className="text-gray-600 italic">Sin descripción</span>}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <button
+            type="button"
+            onClick={editing ? () => setEditing(false) : startEdit}
+            disabled={saving}
+            className="text-xs text-cyan-400 hover:text-cyan-300 font-outfit transition-colors"
+          >
+            {editing ? "cancelar" : "editar"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleHidden}
+            disabled={saving}
+            className="text-xs text-gray-400 hover:text-white font-outfit transition-colors"
+          >
+            {saving && !editing ? <Spinner /> : cat.is_hidden ? "mostrar" : "ocultar"}
+          </button>
+          {!cat.is_hidden && (
+            <Link
+              href={`/categoria/${cat.slug}`}
+              target="_blank"
+              className="text-xs text-purple-400 hover:text-purple-300 font-outfit transition-colors"
+            >
+              ver →
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {editing && (
+        <form onSubmit={handleSave} className="flex flex-col gap-3 border-t border-white/10 pt-3">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nombre"
+            className="glass-input p-2.5 text-sm font-inter"
+            required
+            disabled={saving}
+          />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Descripción breve de la categoría"
+            rows={2}
+            disabled={saving}
+            className="glass-input p-2.5 text-sm font-inter resize-none"
+          />
+          <ImageDropzone
+            preview={imagePreview}
+            onChange={(f) => { setImageFile(f); setImagePreview(URL.createObjectURL(f)); }}
+            disabled={saving}
+          />
+          <button
+            type="submit"
+            disabled={saving || !name.trim()}
+            className="w-full bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold font-outfit py-2.5 rounded-xl hover:opacity-95 transition-all flex items-center justify-center gap-2 disabled:opacity-40 text-sm"
+          >
+            {saving ? <><Spinner /> Guardando...</> : "Guardar cambios"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

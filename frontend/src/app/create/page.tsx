@@ -177,12 +177,17 @@ export default function CreateEventPage() {
 
       const event = await eventRes.json();
 
-      // Si es invitado, guardar slug en localStorage para mostrar banner en el contador
+      // Si es invitado, guardar slug (banner) y claim_token (para asignarlo a su cuenta al registrarse)
       if (!isSignedIn) {
         try {
           const prev: string[] = JSON.parse(localStorage.getItem("ticka_guest_slugs") || "[]");
           if (!prev.includes(event.slug)) {
             localStorage.setItem("ticka_guest_slugs", JSON.stringify([...prev, event.slug]));
+          }
+          if (event.claim_token) {
+            const claims: Record<string, string> = JSON.parse(localStorage.getItem("ticka_guest_claims") || "{}");
+            claims[event.slug] = event.claim_token;
+            localStorage.setItem("ticka_guest_claims", JSON.stringify(claims));
           }
         } catch {}
       }
