@@ -89,6 +89,7 @@ func main() {
 	api.Post("/events/:slug/view", eventHandler.RecordView)
 	api.Get("/events/:slug/analytics", eventHandler.GetAnalytics)
 	api.Patch("/admin/events/:slug/sponsor", eventHandler.SponsorEvent)
+	api.Patch("/admin/events/:slug/image", eventHandler.UpdateEventImage)
 
 	// Categorías (GET público, POST solo admin)
 	api.Get("/categories", categoryHandler.ListCategories)

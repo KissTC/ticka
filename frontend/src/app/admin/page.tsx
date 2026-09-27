@@ -352,6 +352,8 @@ function EventsTab({ token }: { token: string }) {
   const [title, setTitle] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [description, setDescription] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -359,6 +361,7 @@ function EventsTab({ token }: { token: string }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [lastSlug, setLastSlug] = useState<string | null>(null);
+  const [replacingSlug, setReplacingSlug] = useState<string | null>(null);
 
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -382,6 +385,36 @@ function EventsTab({ token }: { token: string }) {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  async function handleReplaceImage(slug: string, file: File) {
+    setReplacingSlug(slug);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const uploadRes = await fetch(`${API}/api/upload`, { method: "POST", body: fd });
+      if (!uploadRes.ok) throw new Error("Error subiendo la imagen");
+      const { url: imageUrl, thumbnail_url: thumbnailUrl } = await uploadRes.json();
+
+      const patchRes = await fetch(`${API}/api/admin/events/${slug}/image`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ image_url: imageUrl, thumbnail_url: thumbnailUrl }),
+      });
+      if (!patchRes.ok) {
+        const err = await patchRes.json();
+        throw new Error(err.error || "Error al actualizar la imagen");
+      }
+
+      setEvents((prev) => prev.map((ev) =>
+        ev.slug === slug ? { ...ev, image_url: imageUrl, thumbnail_url: thumbnailUrl } : ev
+      ));
+      setTimed({ type: "success", msg: `Imagen de "${slug}" actualizada` });
+    } catch (err: unknown) {
+      setTimed({ type: "error", msg: err instanceof Error ? err.message : "Error inesperado" });
+    } finally {
+      setReplacingSlug(null);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -410,6 +443,8 @@ function EventsTab({ token }: { token: string }) {
           image_url: imageUrl,
           timezone,
           category_id: categoryId || undefined,
+          description: description.trim() || undefined,
+          source_url: sourceUrl.trim() || undefined,
         }),
       });
 
@@ -422,8 +457,9 @@ function EventsTab({ token }: { token: string }) {
       setLastSlug(ev.slug);
       setTimed({ type: "success", msg: `"${title}" creado → /c/${ev.slug}` });
 
-      // Resetear solo título, fecha e imagen — mantener categoría para crear varios seguidos
+      // Resetear solo título, fecha, imagen, descripción y fuente — mantener categoría para crear varios seguidos
       setTitle(""); setTargetDate(""); setImageFile(null); setImagePreview(null);
+      setDescription(""); setSourceUrl("");
       loadData();
     } catch (err: unknown) {
       setTimed({ type: "error", msg: err instanceof Error ? err.message : "Error inesperado" });
@@ -507,6 +543,31 @@ function EventsTab({ token }: { token: string }) {
         )}
 
         <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-outfit font-bold text-gray-400 uppercase tracking-wider">Descripción corta</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Se muestra oculta en un dropdown dentro del contador"
+            maxLength={280}
+            rows={2}
+            className="glass-input p-3 text-sm font-inter resize-none"
+            disabled={loading}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-outfit font-bold text-gray-400 uppercase tracking-wider">URL de fuente / sitio oficial</label>
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://..."
+            className="glass-input p-3 text-sm font-inter"
+            disabled={loading}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
           <label className="text-xs font-outfit font-bold text-gray-400 uppercase tracking-wider">Imagen de fondo *</label>
           <ImageDropzone
             preview={imagePreview}
@@ -556,6 +617,24 @@ function EventsTab({ token }: { token: string }) {
                     <span className="text-xs text-gray-600 font-inter">👁️ {ev.views}</span>
                   </div>
                 </div>
+                <label
+                  className={`text-xs font-outfit transition-colors flex-shrink-0 cursor-pointer ${
+                    replacingSlug === ev.slug ? "text-gray-500" : "text-cyan-400 hover:text-cyan-300"
+                  }`}
+                >
+                  {replacingSlug === ev.slug ? <Spinner /> : "imagen"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={replacingSlug !== null}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleReplaceImage(ev.slug, file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
                 <Link
                   href={`/c/${ev.slug}`}
                   target="_blank"
@@ -578,6 +657,7 @@ function SponsoredTab({ token }: { token: string }) {
   const [slug, setSlug] = useState("");
   const [isSponsored, setIsSponsored] = useState(true);
   const [sponsorLabel, setSponsorLabel] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [isPinned, setIsPinned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
@@ -598,7 +678,12 @@ function SponsoredTab({ token }: { token: string }) {
       const res = await fetch(`${API}/api/admin/events/${slug.trim()}/sponsor`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ is_sponsored: isSponsored, sponsor_label: sponsorLabel.trim(), is_pinned: isPinned }),
+        body: JSON.stringify({
+          is_sponsored: isSponsored,
+          sponsor_label: sponsorLabel.trim(),
+          is_pinned: isPinned,
+          source_url: sourceUrl.trim(),
+        }),
       });
 
       if (res.status === 401) throw new Error("Token inválido");
@@ -610,6 +695,7 @@ function SponsoredTab({ token }: { token: string }) {
       setTimed({ type: "success", msg: `"${slug}" actualizado correctamente` });
       setSlug("");
       setSponsorLabel("");
+      setSourceUrl("");
       setIsSponsored(true);
       setIsPinned(false);
     } catch (err: unknown) {
@@ -657,6 +743,19 @@ function SponsoredTab({ token }: { token: string }) {
             className="glass-input p-3 text-sm font-inter"
             disabled={loading}
           />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-outfit font-bold text-gray-400 uppercase tracking-wider">Sitio oficial (URL)</label>
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://..."
+            className="glass-input p-3 text-sm font-inter"
+            disabled={loading}
+          />
+          <p className="text-xs text-gray-600 font-inter">Aparece como enlace dentro del dropdown de detalles del contador</p>
         </div>
 
         <div className="flex flex-col gap-3">

@@ -32,3 +32,16 @@ ROADMAP.md
 
 prueba.html
 frontend_plan.txt
+
+# Cache de URLs de Spaces por entorno (dev/prod tienen imágenes distintas)
+seeds/placeholders/urls.json
+
+# Bytecode de Python
+seeds/__pycache__/
+
+# Candidatos generados por los investigadores (día a día, no son código;
+# el registro definitivo queda en staging.evento_candidato)
+seeds/candidates/*.json
+
+# Config local de Claude Code (permisos/paths de esta máquina, no del equipo)
+.claude/settings.local.json

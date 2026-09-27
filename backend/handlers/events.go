@@ -35,6 +35,8 @@ type EventResponse struct {
 	CategoryID   *string   `json:"category_id,omitempty"`
 	CategorySlug *string   `json:"category_slug,omitempty"`
 	CategoryName *string   `json:"category_name,omitempty"`
+	Description  string    `json:"description,omitempty"`
+	SourceURL    string    `json:"source_url,omitempty"` // sitio oficial si es patrocinado, o fuente que confirmó la fecha
 }
 
 type CreateEventRequest struct {
@@ -44,6 +46,8 @@ type CreateEventRequest struct {
 	ThumbnailURL string `json:"thumbnail_url"` // Opcional: versión reducida para tarjetas
 	Timezone     string `json:"timezone"`      // IANA timezone name, ej. "America/Mexico_City"
 	CategoryID   string `json:"category_id"`   // UUID opcional
+	Description  string `json:"description"`   // Opcional: detalle corto mostrado en un dropdown
+	SourceURL    string `json:"source_url"`     // Opcional: fuente o sitio oficial
 }
 
 func NewEventHandler(db *sql.DB, store *storage.S3Storage, adminToken string) *EventHandler {
@@ -236,11 +240,24 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		thumbnailURL = &req.ThumbnailURL
 	}
 
+	// description y source_url son opcionales — se muestran en un dropdown en la página del contador
+	var description *string
+	if d := strings.TrimSpace(req.Description); d != "" {
+		if len(d) > 280 {
+			d = d[:280]
+		}
+		description = &d
+	}
+	var sourceURL *string
+	if s := strings.TrimSpace(req.SourceURL); s != "" {
+		sourceURL = &s
+	}
+
 	var id string
 	err = h.DB.QueryRow(
-		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id, client_ip)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-		slug, req.Title, targetTime, req.ImageURL, thumbnailURL, categoryID, tz, userID, clientIP,
+		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id, client_ip, description, source_url)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+		slug, req.Title, targetTime, req.ImageURL, thumbnailURL, categoryID, tz, userID, clientIP, description, sourceURL,
 	).Scan(&id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al guardar el evento: " + err.Error()})
@@ -356,7 +373,8 @@ func (h *EventHandler) GetEventBySlug(c *fiber.Ctx) error {
 		       COALESCE(e.thumbnail_url, e.image_url) AS thumbnail_url, e.views, e.created_at,
 		       e.timezone, COALESCE(u.plan, 'free'),
 		       e.is_sponsored, COALESCE(e.sponsor_label, ''), e.is_pinned,
-		       e.category_id::text, c.slug, c.name
+		       e.category_id::text, c.slug, c.name,
+		       COALESCE(e.description, ''), COALESCE(e.source_url, '')
 		FROM events e
 		LEFT JOIN categories c ON e.category_id = c.id
 		LEFT JOIN users u ON e.user_id = u.id
@@ -364,7 +382,8 @@ func (h *EventHandler) GetEventBySlug(c *fiber.Ctx) error {
 	`, slug).Scan(&e.ID, &e.Slug, &e.Title, &e.TargetDate, &e.ImageURL, &e.ThumbnailURL,
 		&e.Views, &e.CreatedAt, &e.Timezone, &ownerPlan,
 		&e.IsSponsored, &e.SponsorLabel, &e.IsPinned,
-		&catID, &catSlug, &catName)
+		&catID, &catSlug, &catName,
+		&e.Description, &e.SourceURL)
 
 	if ownerPlan.Valid {
 		e.OwnerPlan = ownerPlan.String
@@ -660,14 +679,15 @@ func (h *EventHandler) SponsorEvent(c *fiber.Ctx) error {
 		IsSponsored  bool   `json:"is_sponsored"`
 		SponsorLabel string `json:"sponsor_label"`
 		IsPinned     bool   `json:"is_pinned"`
+		SourceURL    string `json:"source_url"` // sitio oficial del patrocinador
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cuerpo inválido"})
 	}
 
 	res, err := h.DB.Exec(
-		`UPDATE events SET is_sponsored=$1, sponsor_label=$2, is_pinned=$3 WHERE slug=$4 AND is_visible=true`,
-		body.IsSponsored, body.SponsorLabel, body.IsPinned, slug,
+		`UPDATE events SET is_sponsored=$1, sponsor_label=$2, is_pinned=$3, source_url=NULLIF($4, '') WHERE slug=$5 AND is_visible=true`,
+		body.IsSponsored, body.SponsorLabel, body.IsPinned, strings.TrimSpace(body.SourceURL), slug,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -677,6 +697,41 @@ func (h *EventHandler) SponsorEvent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Evento no encontrado"})
 	}
 	return c.JSON(fiber.Map{"success": true, "slug": slug})
+}
+
+// PATCH /api/admin/events/:slug/image — reemplaza la imagen de fondo de cualquier evento
+// (útil para contadores sembrados por el pipeline de investigadores, sin dueño real)
+func (h *EventHandler) UpdateEventImage(c *fiber.Ctx) error {
+	if h.AdminToken == "" || c.Get("Authorization") != "Bearer "+h.AdminToken {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "No autorizado"})
+	}
+
+	slug := c.Params("slug")
+	var body struct {
+		ImageURL     string `json:"image_url"`
+		ThumbnailURL string `json:"thumbnail_url"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.ImageURL == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "image_url es requerido"})
+	}
+
+	var thumbnailURL *string
+	if body.ThumbnailURL != "" {
+		thumbnailURL = &body.ThumbnailURL
+	}
+
+	res, err := h.DB.Exec(
+		`UPDATE events SET image_url=$1, thumbnail_url=$2 WHERE slug=$3 AND is_visible=true`,
+		body.ImageURL, thumbnailURL, slug,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Evento no encontrado"})
+	}
+	return c.JSON(fiber.Map{"success": true, "slug": slug, "image_url": body.ImageURL})
 }
 
 // GET /api/sitemap-data — todos los slugs para el sitemap XML (sin auth, sin límite)

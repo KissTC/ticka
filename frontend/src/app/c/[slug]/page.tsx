@@ -14,6 +14,8 @@ interface Event {
   owner_plan: string;
   is_sponsored: boolean;
   sponsor_label: string;
+  description?: string;
+  source_url?: string;
 }
 
 // 1. Obtener datos del evento en el servidor (para SEO y SSR de Open Graph)
@@ -162,6 +164,36 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         <div className="mt-6 text-sm text-gray-400 font-inter">
           👁️ {event.views.toLocaleString()} visitas
         </div>
+
+        {(event.description || event.source_url) && (
+          <details className="mt-4 group">
+            <summary className="cursor-pointer list-none flex items-center justify-center gap-1.5 text-xs text-gray-400 font-inter hover:text-gray-300 transition-colors">
+              <span>Detalles</span>
+              <svg className="w-3 h-3 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.08 1.04l-4.25 4.65a.75.75 0 01-1.08 0l-4.25-4.65a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
+            </summary>
+            <div className="mt-3 pt-3 border-t border-white/10 flex flex-col gap-2 items-center text-center">
+              {event.description && (
+                <p className="text-sm text-gray-300 font-inter leading-relaxed">{event.description}</p>
+              )}
+              {event.source_url && (
+                <a
+                  href={event.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-inter transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.657-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" />
+                    <path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.657 5.656l3-3a4 4 0 00-.225-5.865z" />
+                  </svg>
+                  {event.is_sponsored ? "Sitio oficial" : "Fuente"}
+                </a>
+              )}
+            </div>
+          </details>
+        )}
       </div>
 
       <GuestBanner slug={event.slug} />
