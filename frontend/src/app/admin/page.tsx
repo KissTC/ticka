@@ -953,10 +953,10 @@ function SponsoredTab({ token }: { token: string }) {
           Una vez patrocinado, el cliente puede embeber este iframe en su web:
         </p>
         <div className="bg-black/40 rounded-xl p-4 font-mono text-xs text-gray-300 break-all border border-white/10 whitespace-pre">
-          {`<iframe\n  src="https://ticka.gg/embed/${slug || "SLUG"}" \n  width="500" height="300"\n  frameborder="0"\n></iframe>`}
+          {`<iframe\n  src="https://ticka.dev/embed/${slug || "SLUG"}" \n  width="500" height="300"\n  frameborder="0"\n></iframe>`}
         </div>
         <p className="text-xs text-gray-500 font-inter">
-          Funciona con imagen o video de fondo. Incluye "Powered by ticka.gg".
+          Funciona con imagen o video de fondo. Incluye "Powered by ticka.dev".
         </p>
       </div>
     </div>

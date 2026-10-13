@@ -96,7 +96,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
   const isPro = event.owner_plan === "pro";
   const isVideo = /\.(mp4|webm|mov)$/i.test(event.image_url);
-  const base = process.env.NEXT_PUBLIC_BASE_URL || "https://ticka.gg";
+  const base = process.env.NEXT_PUBLIC_BASE_URL || "https://ticka.dev";
 
   const jsonLd = {
     "@context": "https://schema.org",

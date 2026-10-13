@@ -75,12 +75,12 @@ export default async function EmbedPage({ params }: { params: Promise<{ slug: st
 
       {/* Powered by */}
       <a
-        href="https://ticka.gg"
+        href="https://ticka.dev"
         target="_blank"
         rel="noopener noreferrer"
         className="absolute bottom-3 right-4 text-xs text-white/30 hover:text-white/60 font-outfit transition-colors"
       >
-        ticka.gg
+        ticka.dev
       </a>
     </main>
   );

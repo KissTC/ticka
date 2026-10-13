@@ -24,7 +24,7 @@ async function getSitemapData(): Promise<SitemapData> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL || "https://ticka.gg";
+  const base = process.env.NEXT_PUBLIC_BASE_URL || "https://ticka.dev";
   const data = await getSitemapData();
 
   const staticPages: MetadataRoute.Sitemap = [
