@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getEvent, toDataUrl, tiempoRestante } from "@/lib/events";
+import { getEvent, toDataUrl, tiempoRestante, stillImageUrl } from "@/lib/events";
 
 // Imagen vertical 1080×1920 para historias de Instagram, TikTok y estados de WhatsApp.
 // Se genera al momento ("Faltan X días" cambia), con caché corta en el CDN.
@@ -17,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const fonts = [{ name: "Outfit", data: fontData, weight: 700 as const, style: "normal" as const }];
 
   const isPro = event.owner_plan === "pro";
-  const fondo = await toDataUrl(event.image_url);
+  const fondo = await toDataUrl(stillImageUrl(event));
   const restante = tiempoRestante(event.target_date);
   const fecha = new Date(event.target_date).toLocaleDateString("es-MX", {
     weekday: "long",

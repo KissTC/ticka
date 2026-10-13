@@ -31,6 +31,14 @@ export function isVideoUrl(url: string): boolean {
   return /\.(mp4|webm|mov)$/i.test(url);
 }
 
+// Imagen fija del contador: con video de fondo es la portada (thumbnail_url, un fotograma JPEG
+// tomado al crearlo); los videos subidos antes de la portada no la tienen y regresa "".
+export function stillImageUrl(event: { image_url: string; thumbnail_url?: string }): string {
+  if (!isVideoUrl(event.image_url)) return event.image_url;
+  const thumb = event.thumbnail_url ?? "";
+  return isVideoUrl(thumb) ? "" : thumb;
+}
+
 // Satori solo soporta JPEG y PNG: cualquier otro formato (o un video) regresa "" y se usa un degradado.
 export async function toDataUrl(url: string): Promise<string> {
   if (!url || isVideoUrl(url)) return "";

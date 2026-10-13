@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { stillImageUrl } from "@/lib/events";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -10,6 +11,7 @@ interface Event {
   title: string;
   target_date: string;
   image_url: string;
+  thumbnail_url?: string;
   category_name?: string;
 }
 
@@ -69,7 +71,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     );
   }
 
-  const imageDataUrl = await toDataUrl(event.image_url);
+  const imageDataUrl = await toDataUrl(stillImageUrl(event));
 
   const formattedDate = new Date(event.target_date).toLocaleDateString("es-ES", {
     weekday: "short", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",

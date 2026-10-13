@@ -3,6 +3,7 @@ import Link from "next/link";
 import CountdownTimer from "@/components/CountdownTimer";
 import GuestBanner from "@/components/GuestBanner";
 import CreateYourOwnCTA from "@/components/CreateYourOwnCTA";
+import { stillImageUrl } from "@/lib/events";
 
 interface Event {
   id: string;
@@ -10,6 +11,7 @@ interface Event {
   title: string;
   target_date: string;
   image_url: string;
+  thumbnail_url?: string;
   views: number;
   timezone: string;
   owner_plan: string;
@@ -126,6 +128,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           playsInline
           className="absolute inset-0 w-full h-full object-cover"
           src={event.image_url}
+          poster={stillImageUrl(event) || undefined}
         />
       ) : (
         <div

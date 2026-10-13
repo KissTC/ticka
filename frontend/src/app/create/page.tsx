@@ -7,6 +7,7 @@ import { useAuth } from "@clerk/nextjs";
 import UnsplashPicker from "@/components/UnsplashPicker";
 import { getAttribution } from "@/lib/attribution";
 import { track } from "@/lib/analytics";
+import { captureVideoFrame } from "@/lib/videoFrame";
 
 interface Category {
   id: string;
@@ -148,6 +149,20 @@ export default function CreateEventPage() {
         const { url, thumbnail_url } = await uploadRes.json();
         imageUrl = url;
         thumbnailUrl = thumbnail_url ?? undefined;
+
+        // Video: subir un fotograma como portada (imagen de historia y vista previa al compartir).
+        // Es opcional: si falla, el contador se crea igual.
+        if (isVideo) {
+          try {
+            const frame = await captureVideoFrame(image!);
+            if (frame) {
+              const posterData = new FormData();
+              posterData.append("image", new File([frame], "portada.jpg", { type: "image/jpeg" }));
+              const posterRes = await fetch("/api/proxy/api/upload", { method: "POST", body: posterData });
+              if (posterRes.ok) thumbnailUrl = (await posterRes.json()).url;
+            }
+          } catch {}
+        }
       }
 
       // 2. Registrar el evento en base de datos
