@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { FECHAS } from "@/lib/fechas";
 
 interface SlugEntry {
   slug: string;
@@ -47,5 +48,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...eventPages, ...categoryPages];
+  const fechaPages: MetadataRoute.Sitemap = [
+    { url: `${base}/cuanto-falta`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
+    ...FECHAS.map((f) => ({
+      url: `${base}/cuanto-falta/${f.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "daily" as const,
+      priority: 0.8,
+    })),
+  ];
+
+  return [...staticPages, ...fechaPages, ...eventPages, ...categoryPages];
 }

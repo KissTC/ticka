@@ -1,5 +1,7 @@
 import Link from "next/link";
 import EventsWithSearch from "@/components/EventsWithSearch";
+import FechaCard, { fechasPorCercania } from "@/components/FechaCard";
+import { FECHAS } from "@/lib/fechas";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 
 interface Event {
@@ -28,8 +30,14 @@ async function getPopularEvents(): Promise<Event[]> {
   }
 }
 
+function ahora(): Date {
+  return new Date();
+}
+
 export default async function HomePage() {
   const events = await getPopularEvents();
+  const now = ahora();
+  const proximasFechas = fechasPorCercania(FECHAS, now).slice(0, 6);
 
   return (
     <main className="min-h-screen px-6 py-12 max-w-6xl mx-auto flex flex-col justify-between">
@@ -75,6 +83,21 @@ export default async function HomePage() {
       </section>
 
       <EventsWithSearch initial={events} />
+
+      {/* Fechas fijas de México */}
+      <section className="mt-16 mb-16">
+        <div className="flex justify-between items-baseline mb-6">
+          <h2 className="text-2xl md:text-3xl font-extrabold font-outfit text-white tracking-tight">¿Cuánto falta para…?</h2>
+          <Link href="/cuanto-falta" className="text-sm text-purple-300 hover:text-purple-200 font-inter">
+            Ver todas las fechas →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {proximasFechas.map((f) => (
+            <FechaCard key={f.slug} fecha={f} ahora={now} />
+          ))}
+        </div>
+      </section>
 
       {/* Footer */}
       <footer className="text-center text-gray-500 text-sm font-inter border-t border-white/5 pt-8">

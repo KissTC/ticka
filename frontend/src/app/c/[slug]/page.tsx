@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import CountdownTimer from "@/components/CountdownTimer";
 import GuestBanner from "@/components/GuestBanner";
+import CreateYourOwnCTA from "@/components/CreateYourOwnCTA";
 
 interface Event {
   id: string;
@@ -195,6 +196,9 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           </details>
         )}
       </div>
+
+      {/* Invitación a crear el suyo — oculta en Pro (sin marca de Ticka) */}
+      {!isPro && <CreateYourOwnCTA origen="contador-cta" slug={event.slug} />}
 
       <GuestBanner slug={event.slug} />
 
