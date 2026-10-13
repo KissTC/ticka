@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { track } from "@/lib/analytics";
 
@@ -13,6 +13,15 @@ const nowSeconds = () => Math.floor(Date.now() / 1000);
 const serverSeconds = () => 0;
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+function downloadFile(file: File) {
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 interface Props {
   slug: string;
@@ -29,8 +38,26 @@ interface Props {
 export default function StoryView({ slug, title, targetDate, timezone, imageUrl, isVideo, isPro, sponsorLabel }: Props) {
   const now = useSyncExternalStore(subscribeClock, nowSeconds, serverSeconds);
   const [showControls, setShowControls] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // La imagen se prepara al abrir la vista: Chrome en Android solo permite navigator.share()
+  // unos segundos después del toque, y generarla en ese momento tarda más que eso.
+  const [file, setFile] = useState<File | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const loadImage = useCallback(async () => {
+    const res = await fetch(`/c/${slug}/historia/imagen`);
+    if (!res.ok) throw new Error("imagen");
+    return new File([await res.blob()], `ticka-${slug}.png`, { type: "image/png" });
+  }, [slug]);
+
+  useEffect(() => {
+    let alive = true;
+    loadImage()
+      .then((f) => alive && setFile(f))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [loadImage]);
 
   const diff = Math.max(0, Math.floor(new Date(targetDate).getTime() / 1000) - now);
   const ready = now > 0;
@@ -48,39 +75,33 @@ export default function StoryView({ slug, title, targetDate, timezone, imageUrl,
     timeZone: timezone || "UTC",
   });
 
-  async function handleImage(e: React.MouseEvent) {
+  function handleImage(e: React.MouseEvent) {
     e.stopPropagation();
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/c/${slug}/historia/imagen`);
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const file = new File([blob], `ticka-${slug}.png`, { type: "image/png" });
-
-      // En el celular, compartir directo a Instagram/WhatsApp; si no se puede, descargar el archivo
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title });
-          track("historia-imagen", { modo: "compartir" });
-        } catch (err) {
-          if ((err as Error).name !== "AbortError") throw err;
-        }
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = file.name;
-        a.click();
-        URL.revokeObjectURL(url);
-        track("historia-imagen", { modo: "descarga" });
+    if (!file) {
+      if (failed) {
+        setFailed(false);
+        loadImage().then(setFile).catch(() => setFailed(true));
       }
-    } catch {
-      setError("No se pudo generar la imagen. Intenta de nuevo.");
-    } finally {
-      setBusy(false);
+      return;
+    }
+
+    // En el celular, compartir directo a Instagram/WhatsApp; si no se puede (o el navegador lo rechaza), descargar
+    if (navigator.canShare?.({ files: [file] })) {
+      navigator
+        .share({ files: [file], title })
+        .then(() => track("historia-imagen", { modo: "compartir" }))
+        .catch((err: Error) => {
+          if (err.name === "AbortError") return;
+          downloadFile(file);
+          track("historia-imagen", { modo: "descarga" });
+        });
+    } else {
+      downloadFile(file);
+      track("historia-imagen", { modo: "descarga" });
     }
   }
+
+  const buttonLabel = (ready: string) => (file ? ready : failed ? "↻ Reintentar imagen" : "Preparando imagen…");
 
   return (
     <main className="min-h-[100dvh] bg-[#05020f] flex flex-col items-center justify-center md:py-6 md:gap-4">
@@ -148,13 +169,13 @@ export default function StoryView({ slug, title, targetDate, timezone, imageUrl,
             <div className="flex flex-col items-end gap-1">
               <button
                 onClick={handleImage}
-                disabled={busy}
+                disabled={!file && !failed}
                 className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white text-xs font-bold font-outfit px-4 py-2 rounded-full disabled:opacity-60"
               >
-                {busy ? "Generando…" : "📲 Compartir imagen"}
+                {buttonLabel("📲 Compartir imagen")}
               </button>
               <span className="text-[0.65rem] text-white/70 font-inter">Toca la pantalla para ocultar los botones</span>
-              {error && <span className="text-[0.65rem] text-red-300 font-inter">{error}</span>}
+              {failed && <span className="text-[0.65rem] text-red-300 font-inter">No se pudo generar la imagen.</span>}
             </div>
           </div>
         )}
@@ -168,13 +189,13 @@ export default function StoryView({ slug, title, targetDate, timezone, imageUrl,
           </Link>
           <button
             onClick={handleImage}
-            disabled={busy}
+            disabled={!file && !failed}
             className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white text-sm font-bold font-outfit px-6 py-2.5 rounded-full hover:opacity-95 transition-all disabled:opacity-60"
           >
-            {busy ? "Generando…" : "⬇️ Descargar imagen (1080×1920)"}
+            {buttonLabel("⬇️ Descargar imagen (1080×1920)")}
           </button>
         </div>
-        {error && <span className="text-xs text-red-300 font-inter">{error}</span>}
+        {failed && <span className="text-xs text-red-300 font-inter">No se pudo generar la imagen.</span>}
       </div>
     </main>
   );
