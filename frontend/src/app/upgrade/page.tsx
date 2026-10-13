@@ -237,6 +237,8 @@ export default function UpgradePage() {
         <button
           onClick={handleSubscribe}
           disabled={loading}
+          data-umami-event="suscribirse"
+          data-umami-event-plan={billing === "monthly" ? "mensual" : "anual"}
           className="w-full bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold font-outfit py-4 rounded-xl hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 disabled:opacity-50"
         >
           {loading ? (

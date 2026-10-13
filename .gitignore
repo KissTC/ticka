@@ -45,3 +45,7 @@ seeds/candidates/*.json
 
 # Config local de Claude Code (permisos/paths de esta máquina, no del equipo)
 .claude/settings.local.json
+# Documentos locales de planeación y contexto para Claude Code (no se suben)
+ticka.md
+ticka-plan-desarrollo.md
+ticka-bitacora.md

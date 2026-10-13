@@ -21,7 +21,7 @@ export default function PrivacidadPage() {
       </header>
 
       <h1 className="text-3xl md:text-4xl font-extrabold font-outfit text-white mb-2">Aviso de Privacidad</h1>
-      <p className="text-sm text-gray-500 font-inter mb-10">Última actualización: 15 de junio de 2026</p>
+      <p className="text-sm text-gray-500 font-inter mb-10">Última actualización: 13 de octubre de 2026</p>
 
       <div className="flex flex-col gap-8">
         <section>
@@ -62,6 +62,12 @@ export default function PrivacidadPage() {
               <strong className="text-gray-300">Datos de uso:</strong> dirección IP (para control
               de límites de uso del Servicio), número de contadores creados y estadísticas de
               visualización de tus contadores.
+            </li>
+            <li>
+              <strong className="text-gray-300">Origen de la visita:</strong> el sitio o enlace desde
+              el que llegaste a ticka por primera vez (por ejemplo, el parámetro de campaña de un
+              enlace o el dominio de referencia), asociado a tu cuenta y a los contadores que crees.
+              Lo usamos solo para saber qué canales nos traen usuarios.
             </li>
           </ul>
           <p className="text-gray-400 font-inter text-sm leading-relaxed mt-3">
@@ -126,6 +132,11 @@ export default function PrivacidadPage() {
                   <td className="py-2 pr-4">Hospedaje del sitio web</td>
                   <td className="py-2">EE.UU.</td>
                 </tr>
+                <tr>
+                  <td className="py-2 pr-4">Umami</td>
+                  <td className="py-2 pr-4">Estadísticas agregadas y anónimas de uso del sitio</td>
+                  <td className="py-2">UE</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -144,6 +155,12 @@ export default function PrivacidadPage() {
             gestionadas por Clerk. Sin estas cookies, no es posible iniciar sesión ni acceder a las
             funciones de usuario. No utilizamos cookies de análisis, publicidad ni seguimiento de
             comportamiento. Al usar ticka, aceptas el uso de estas cookies esenciales.
+          </p>
+          <p className="text-gray-400 font-inter text-sm leading-relaxed mt-3">
+            Para medir el uso del sitio usamos Umami, una herramienta de analítica que no usa cookies
+            ni identifica a personas: solo genera estadísticas agregadas (páginas visitadas, país,
+            tipo de dispositivo). Además, guardamos en el almacenamiento local de tu navegador el
+            origen de tu primera visita (ver sección 2); puedes borrarlo limpiando los datos del sitio.
           </p>
         </section>
 

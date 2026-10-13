@@ -50,7 +50,7 @@ func main() {
 
 	eventHandler := handlers.NewEventHandler(db, s3Storage, cfg.AdminToken)
 	categoryHandler := handlers.NewCategoryHandler(db, cfg.AdminToken)
-	userHandler := handlers.NewUserHandler(db, cfg.ClerkSecretKey)
+	userHandler := handlers.NewUserHandler(db, cfg.ClerkSecretKey, cfg.AdminToken)
 	stripeHandler := handlers.NewStripeHandler(db,
 		cfg.StripeSecretKey, cfg.StripeWebhookSecret,
 		cfg.StripePriceIDMonthly, cfg.StripePriceIDYearly,
@@ -102,6 +102,8 @@ func main() {
 	api.Get("/users/me", userHandler.GetMe)
 	api.Get("/users/me/events", userHandler.GetMyEvents)
 	api.Post("/users/me/claim", userHandler.ClaimGuestEvents)
+	api.Post("/users/me/attribution", userHandler.SetAttribution)
+	api.Get("/admin/attribution", userHandler.AttributionReport)
 
 	// Stripe
 	api.Post("/stripe/checkout", stripeHandler.CreateCheckoutSession)

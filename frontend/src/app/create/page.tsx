@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import UnsplashPicker from "@/components/UnsplashPicker";
+import { getAttribution } from "@/lib/attribution";
+import { track } from "@/lib/analytics";
 
 interface Category {
   id: string;
@@ -162,6 +164,7 @@ export default function CreateEventPage() {
           thumbnail_url: thumbnailUrl,
           timezone,
           category_id: categoryId || undefined,
+          attribution: getAttribution() ?? undefined,
         }),
       });
 
@@ -191,6 +194,8 @@ export default function CreateEventPage() {
           }
         } catch {}
       }
+
+      track("contador-creado", { cuenta: isSignedIn ? "usuario" : "invitado" });
 
       // 3. Redirigir al contador dinámico recién creado
       router.push(`/c/${event.slug}`);

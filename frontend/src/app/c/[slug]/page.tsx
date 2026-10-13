@@ -140,7 +140,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           <Link href="/" className="text-2xl font-extrabold font-outfit text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
             ticka
           </Link>
-          <Link href="/create" className="glass-panel text-white font-medium text-sm px-5 py-2 rounded-full hover:bg-white/10 transition-all font-outfit">
+          <Link href="/create" data-umami-event="crear-contador" data-umami-event-origen="contador" className="glass-panel text-white font-medium text-sm px-5 py-2 rounded-full hover:bg-white/10 transition-all font-outfit">
             Crear Nuevo
           </Link>
         </header>

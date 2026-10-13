@@ -69,6 +69,8 @@ export default async function DashboardPage() {
           {atLimit ? (
             <Link
               href="/upgrade"
+              data-umami-event="hazte-pro"
+              data-umami-event-origen="limite-dashboard"
               className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white text-sm font-bold px-5 py-2 rounded-full hover:opacity-95 transition-all font-outfit"
             >
               🔒 Límite alcanzado · Mejorar a Pro
@@ -109,6 +111,8 @@ export default async function DashboardPage() {
           </div>
           <Link
             href="/upgrade"
+            data-umami-event="hazte-pro"
+            data-umami-event-origen="banner-dashboard"
             className="shrink-0 bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold font-outfit py-2.5 px-6 rounded-xl hover:opacity-95 transition-all text-sm"
           >
             Ver planes →

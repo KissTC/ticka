@@ -1,8 +1,13 @@
 import {ClerkProvider} from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Outfit, Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import GuestClaimer from "@/components/GuestClaimer";
+import AttributionTracker from "@/components/AttributionTracker";
+
+// Analítica sin cookies (Umami Cloud). Sin la variable no se carga, así local y previews no ensucian los datos.
+const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
 
 const outfit = Outfit({ 
   subsets: ["latin"],
@@ -30,9 +35,13 @@ export default function RootLayout({
       <body className="antialiased">
         <ClerkProvider afterSignOutUrl="/">
           <GuestClaimer />
+          <AttributionTracker />
           {children}
         </ClerkProvider>
       </body>
+      {umamiWebsiteId && (
+        <Script src="https://cloud.umami.is/script.js" data-website-id={umamiWebsiteId} strategy="afterInteractive" />
+      )}
     </html>
   );
 }

@@ -42,14 +42,15 @@ type EventResponse struct {
 }
 
 type CreateEventRequest struct {
-	Title        string `json:"title"`
-	TargetDate   string `json:"target_date"` // Formato YYYY-MM-DDTHH:MM (datetime-local)
-	ImageURL     string `json:"image_url"`
-	ThumbnailURL string `json:"thumbnail_url"` // Opcional: versión reducida para tarjetas
-	Timezone     string `json:"timezone"`      // IANA timezone name, ej. "America/Mexico_City"
-	CategoryID   string `json:"category_id"`   // UUID opcional
-	Description  string `json:"description"`   // Opcional: detalle corto mostrado en un dropdown
-	SourceURL    string `json:"source_url"`     // Opcional: fuente o sitio oficial
+	Title        string       `json:"title"`
+	TargetDate   string       `json:"target_date"` // Formato YYYY-MM-DDTHH:MM (datetime-local)
+	ImageURL     string       `json:"image_url"`
+	ThumbnailURL string       `json:"thumbnail_url"` // Opcional: versión reducida para tarjetas
+	Timezone     string       `json:"timezone"`      // IANA timezone name, ej. "America/Mexico_City"
+	CategoryID   string       `json:"category_id"`   // UUID opcional
+	Description  string       `json:"description"`   // Opcional: detalle corto mostrado en un dropdown
+	SourceURL    string       `json:"source_url"`    // Opcional: fuente o sitio oficial
+	Attribution  *Attribution `json:"attribution"`   // Opcional: origen first-touch del creador
 }
 
 func NewEventHandler(db *sql.DB, store *storage.S3Storage, adminToken string) *EventHandler {
@@ -268,11 +269,20 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		claimToken = &t
 	}
 
+	// Atribución opcional: si no viene, las columnas quedan NULL ("sin atribución")
+	var utmSource, utmMedium, utmCampaign, ref, referrer *string
+	if a := req.Attribution; a != nil {
+		a.clean()
+		utmSource, utmMedium, utmCampaign, ref, referrer = &a.UTMSource, &a.UTMMedium, &a.UTMCampaign, &a.Ref, &a.Referrer
+	}
+
 	var id string
 	err = h.DB.QueryRow(
-		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id, client_ip, description, source_url, claim_token)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+		`INSERT INTO events (slug, title, target_date, image_url, thumbnail_url, category_id, timezone, user_id, client_ip, description, source_url, claim_token,
+		                     utm_source, utm_medium, utm_campaign, ref, first_referrer)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
 		slug, req.Title, targetTime, req.ImageURL, thumbnailURL, categoryID, tz, userID, clientIP, description, sourceURL, claimToken,
+		utmSource, utmMedium, utmCampaign, ref, referrer,
 	).Scan(&id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al guardar el evento: " + err.Error()})

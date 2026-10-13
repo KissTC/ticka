@@ -13,11 +13,12 @@ import (
 type UserHandler struct {
 	DB             *sql.DB
 	ClerkSecretKey string
+	AdminToken     string
 }
 
-func NewUserHandler(db *sql.DB, clerkSecretKey string) *UserHandler {
+func NewUserHandler(db *sql.DB, clerkSecretKey, adminToken string) *UserHandler {
 	clerk.SetKey(clerkSecretKey)
-	return &UserHandler{DB: db, ClerkSecretKey: clerkSecretKey}
+	return &UserHandler{DB: db, ClerkSecretKey: clerkSecretKey, AdminToken: adminToken}
 }
 
 // verifyClerkToken valida el JWT de Clerk y retorna el clerkUserID.

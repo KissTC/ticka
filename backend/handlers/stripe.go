@@ -46,13 +46,16 @@ func (h *StripeHandler) CreateCheckoutSession(c *fiber.Ctx) error {
 
 	var userID, plan string
 	var stripeCustomerID sql.NullString
+	var a Attribution
 	err = h.DB.QueryRow(
 		`INSERT INTO users (clerk_id, email, plan)
 		 VALUES ($1, '', 'free')
 		 ON CONFLICT (clerk_id) DO UPDATE SET clerk_id = EXCLUDED.clerk_id
-		 RETURNING id, plan, stripe_customer_id`,
+		 RETURNING id, plan, stripe_customer_id,
+		           COALESCE(utm_source, ''), COALESCE(utm_medium, ''), COALESCE(utm_campaign, ''),
+		           COALESCE(ref, ''), COALESCE(first_referrer, '')`,
 		clerkID,
-	).Scan(&userID, &plan, &stripeCustomerID)
+	).Scan(&userID, &plan, &stripeCustomerID, &a.UTMSource, &a.UTMMedium, &a.UTMCampaign, &a.Ref, &a.Referrer)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error al obtener usuario"})
 	}
@@ -69,14 +72,27 @@ func (h *StripeHandler) CreateCheckoutSession(c *fiber.Ctx) error {
 		body.PriceID = h.PriceIDMonthly
 	}
 
+	// La atribución se lee de la BD (no del cliente) y se copia a la sesión y a la
+	// suscripción para verla en el dashboard de Stripe.
+	metadata := map[string]string{"user_id": userID}
+	for k, v := range map[string]string{
+		"utm_source": a.UTMSource, "utm_medium": a.UTMMedium, "utm_campaign": a.UTMCampaign,
+		"ref": a.Ref, "first_referrer": a.Referrer,
+	} {
+		if v != "" {
+			metadata[k] = v
+		}
+	}
+
 	params := &stripe.CheckoutSessionParams{
 		Mode: stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{Price: stripe.String(body.PriceID), Quantity: stripe.Int64(1)},
 		},
-		SuccessURL: stripe.String(h.FrontendURL + "/upgrade/success?session_id={CHECKOUT_SESSION_ID}"),
-		CancelURL:  stripe.String(h.FrontendURL + "/upgrade"),
-		Metadata:   map[string]string{"user_id": userID},
+		SuccessURL:       stripe.String(h.FrontendURL + "/upgrade/success?session_id={CHECKOUT_SESSION_ID}"),
+		CancelURL:        stripe.String(h.FrontendURL + "/upgrade"),
+		Metadata:         metadata,
+		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{Metadata: metadata},
 	}
 
 	if stripeCustomerID.Valid && stripeCustomerID.String != "" {

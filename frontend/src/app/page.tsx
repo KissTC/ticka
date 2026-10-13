@@ -55,7 +55,7 @@ export default async function HomePage() {
               </button>
             </SignInButton>
           </Show>
-          <Link href="/create" className="glass-panel text-white font-medium px-6 py-2.5 rounded-full hover:bg-white/10 hover:border-white/20 transition-all font-outfit">
+          <Link href="/create" data-umami-event="crear-contador" data-umami-event-origen="home" className="glass-panel text-white font-medium px-6 py-2.5 rounded-full hover:bg-white/10 hover:border-white/20 transition-all font-outfit">
             Crear Contador
           </Link>
         </div>

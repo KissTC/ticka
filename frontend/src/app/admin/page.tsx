@@ -76,7 +76,7 @@ function ImageDropzone({
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [savedToken, setSavedToken] = useState<string | null>(null);
-  const [tab, setTab] = useState<"categories" | "events" | "sponsored">("categories");
+  const [tab, setTab] = useState<"categories" | "events" | "sponsored" | "attribution">("categories");
 
   // Leer token guardado en sessionStorage al montar
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 glass-panel rounded-xl p-1 w-fit mb-8">
-        {(["categories", "events", "sponsored"] as const).map((t) => (
+        {(["categories", "events", "sponsored", "attribution"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -165,7 +165,7 @@ export default function AdminPage() {
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            {t === "categories" ? "Categorías" : t === "events" ? "Contadores" : "★ Patrocinados"}
+            {t === "categories" ? "Categorías" : t === "events" ? "Contadores" : t === "sponsored" ? "★ Patrocinados" : "Atribución"}
           </button>
         ))}
       </div>
@@ -174,8 +174,10 @@ export default function AdminPage() {
         <CategoriesTab token={savedToken} />
       ) : tab === "events" ? (
         <EventsTab token={savedToken} />
-      ) : (
+      ) : tab === "sponsored" ? (
         <SponsoredTab token={savedToken} />
+      ) : (
+        <AttributionTab token={savedToken} />
       )}
     </main>
   );
@@ -959,6 +961,103 @@ function SponsoredTab({ token }: { token: string }) {
           Funciona con imagen o video de fondo. Incluye "Powered by ticka.dev".
         </p>
       </div>
+    </div>
+  );
+}
+
+// ─── Tab: Atribución ──────────────────────────────────────────────────────────
+
+interface SourceCount {
+  source: string;
+  users: number;
+  pro: number;
+  events: number;
+}
+
+function AttributionTab({ token }: { token: string }) {
+  const [days, setDays] = useState(0);
+  const [sources, setSources] = useState<SourceCount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API}/api/admin/attribution?days=${days}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (res.status === 401) throw new Error("Token inválido");
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Error al cargar");
+        return res.json();
+      })
+      .then((data: { sources: SourceCount[] }) => setSources(data.sources))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Error inesperado"))
+      .finally(() => setLoading(false));
+  }, [token, days]);
+
+  const total = sources.reduce(
+    (acc, s) => ({ users: acc.users + s.users, pro: acc.pro + s.pro, events: acc.events + s.events }),
+    { users: 0, pro: 0, events: 0 }
+  );
+
+  return (
+    <div className="glass-panel rounded-2xl p-6 flex flex-col gap-5">
+      <div className="flex flex-wrap justify-between items-start gap-4">
+        <div>
+          <h2 className="text-lg font-bold font-outfit text-white">Registros y Pro por fuente</h2>
+          <p className="text-xs text-gray-500 font-inter mt-0.5">
+            Fuente = utm_source › ref › sitio de referencia › directo (primera visita). &quot;Sin atribución&quot; son
+            cuentas y contadores anteriores a la medición, sembrados u oficiales.
+          </p>
+        </div>
+        <select
+          value={days}
+          onChange={(e) => {
+            setDays(Number(e.target.value));
+            setLoading(true);
+            setError(null);
+          }}
+          className="glass-input p-2 text-sm font-inter"
+        >
+          <option value={0}>Todo</option>
+          <option value={30}>Últimos 30 días</option>
+          <option value={7}>Últimos 7 días</option>
+        </select>
+      </div>
+
+      {error && <Toast msg={error} type="error" />}
+
+      {loading ? (
+        <div className="flex justify-center py-8"><Spinner /></div>
+      ) : sources.length === 0 ? (
+        <p className="text-sm text-gray-500 font-inter">Sin datos en este periodo.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm font-inter text-gray-300 border-collapse">
+            <thead>
+              <tr className="border-b border-white/10 text-xs font-outfit uppercase tracking-wider text-gray-400">
+                <th className="text-left py-2 pr-4">Fuente</th>
+                <th className="text-right py-2 pr-4">Registros</th>
+                <th className="text-right py-2 pr-4">Pro</th>
+                <th className="text-right py-2">Contadores</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {sources.map((s) => (
+                <tr key={s.source}>
+                  <td className={`py-2 pr-4 ${s.source === "sin atribución" ? "text-gray-500 italic" : ""}`}>{s.source}</td>
+                  <td className="py-2 pr-4 text-right">{s.users}</td>
+                  <td className="py-2 pr-4 text-right text-purple-300 font-semibold">{s.pro}</td>
+                  <td className="py-2 text-right">{s.events}</td>
+                </tr>
+              ))}
+              <tr className="border-t border-white/10 font-semibold text-white">
+                <td className="py-2 pr-4">Total</td>
+                <td className="py-2 pr-4 text-right">{total.users}</td>
+                <td className="py-2 pr-4 text-right text-purple-300">{total.pro}</td>
+                <td className="py-2 text-right">{total.events}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
