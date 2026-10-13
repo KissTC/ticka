@@ -160,7 +160,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           {event.title}
         </h2>
 
-        <CountdownTimer targetDate={event.target_date} eventTimezone={event.timezone} slug={event.slug} />
+        <CountdownTimer targetDate={event.target_date} eventTimezone={event.timezone} slug={event.slug} storyHref={`/c/${event.slug}/historia`} />
 
         <div className="mt-6 text-sm text-gray-400 font-inter">
           👁️ {event.views.toLocaleString()} visitas

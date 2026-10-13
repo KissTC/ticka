@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 interface TimeLeft {
   days: number;
@@ -42,10 +43,12 @@ export default function CountdownTimer({
   targetDate,
   eventTimezone,
   slug,
+  storyHref,
 }: {
   targetDate: string;
   eventTimezone?: string;
   slug?: string;
+  storyHref?: string; // vista vertical para historias (/c/<slug>/historia)
 }) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0, ended: false });
   const [serverOffset, setServerOffset] = useState<number>(0);
@@ -165,13 +168,24 @@ export default function CountdownTimer({
         ))}
       </div>
 
-      {/* Botón de Compartir en Vidrio */}
-      <button
-        onClick={handleCopyLink}
-        className="glass-panel bg-white/10 hover:bg-white/20 border-white/20 hover:scale-[1.03] active:scale-[0.98] transition-all font-outfit px-6 py-3 rounded-full text-white font-medium text-sm flex items-center gap-2 mt-4 cursor-pointer"
-      >
-        {copied ? "✅ ¡Copiado!" : "🔗 Copiar Enlace Viral"}
-      </button>
+      {/* Botones de Compartir en Vidrio */}
+      <div className="flex flex-wrap justify-center gap-3 mt-4">
+        <button
+          onClick={handleCopyLink}
+          className="glass-panel bg-white/10 hover:bg-white/20 border-white/20 hover:scale-[1.03] active:scale-[0.98] transition-all font-outfit px-6 py-3 rounded-full text-white font-medium text-sm flex items-center gap-2 cursor-pointer"
+        >
+          {copied ? "✅ ¡Copiado!" : "🔗 Copiar Enlace Viral"}
+        </button>
+        {storyHref && (
+          <Link
+            href={storyHref}
+            data-umami-event="historia-abrir"
+            className="glass-panel bg-white/10 hover:bg-white/20 border-white/20 hover:scale-[1.03] active:scale-[0.98] transition-all font-outfit px-6 py-3 rounded-full text-white font-medium text-sm flex items-center gap-2"
+          >
+            📲 Para tu historia
+          </Link>
+        )}
+      </div>
 
       {/* Fecha en hora local del visitante */}
       {(() => {
