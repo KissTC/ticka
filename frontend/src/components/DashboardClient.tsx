@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import AnalyticsModal from "@/components/AnalyticsModal";
+import EmbedModal from "@/components/EmbedModal";
+import { track } from "@/lib/analytics";
 
 interface Event {
   id: string;
@@ -160,6 +162,7 @@ export default function DashboardClient({
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
   const [analyticsEvent, setAnalyticsEvent] = useState<Event | null>(null);
+  const [embedEvent, setEmbedEvent] = useState<Event | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -256,6 +259,14 @@ export default function DashboardClient({
           onClose={() => setAnalyticsEvent(null)}
         />
       )}
+      {embedEvent && (
+        <EmbedModal
+          slug={embedEvent.slug}
+          title={embedEvent.title}
+          isPro={userPlan === "pro"}
+          onClose={() => setEmbedEvent(null)}
+        />
+      )}
       {deletingEvent && (
         <ConfirmDialog
           title={deletingEvent.title}
@@ -319,6 +330,16 @@ export default function DashboardClient({
                 className="bg-black/60 hover:bg-cyan-500/80 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm transition-all backdrop-blur-sm"
               >
                 📊
+              </button>
+              <button
+                onClick={() => {
+                  setEmbedEvent(event);
+                  track("embed-abrir", { origen: "dashboard" });
+                }}
+                title="Insertar en tu web o en OBS"
+                className="bg-black/60 hover:bg-cyan-500/80 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-mono font-bold transition-all backdrop-blur-sm"
+              >
+                {"</>"}
               </button>
               <button
                 onClick={() => setEditingEvent(event)}

@@ -4,6 +4,7 @@ import CountdownTimer from "@/components/CountdownTimer";
 import GuestBanner from "@/components/GuestBanner";
 import CreateYourOwnCTA from "@/components/CreateYourOwnCTA";
 import { stillImageUrl } from "@/lib/events";
+import { EmbedButton } from "@/components/EmbedModal";
 
 interface Event {
   id: string;
@@ -163,7 +164,13 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           {event.title}
         </h2>
 
-        <CountdownTimer targetDate={event.target_date} eventTimezone={event.timezone} slug={event.slug} storyHref={`/c/${event.slug}/historia`} />
+        <CountdownTimer
+          targetDate={event.target_date}
+          eventTimezone={event.timezone}
+          slug={event.slug}
+          storyHref={`/c/${event.slug}/historia`}
+          actions={<EmbedButton slug={event.slug} title={event.title} isPro={isPro} />}
+        />
 
         <div className="mt-6 text-sm text-gray-400 font-inter">
           👁️ {event.views.toLocaleString()} visitas

@@ -1,16 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { track } from "@/lib/analytics";
-
-// Reloj compartido: notifica cada segundo; en el servidor es 0 (se muestran guiones hasta hidratar)
-function subscribeClock(cb: () => void) {
-  const id = setInterval(cb, 1000);
-  return () => clearInterval(id);
-}
-const nowSeconds = () => Math.floor(Date.now() / 1000);
-const serverSeconds = () => 0;
+import { useRemaining } from "@/lib/useNowSeconds";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -36,7 +29,7 @@ interface Props {
 
 // Vista vertical 9:16 de un contador, pensada para captura de pantalla o para descargar como imagen
 export default function StoryView({ slug, title, targetDate, timezone, imageUrl, isVideo, isPro, sponsorLabel }: Props) {
-  const now = useSyncExternalStore(subscribeClock, nowSeconds, serverSeconds);
+  const { ready, ended, days, hours, minutes, seconds } = useRemaining(targetDate);
   const [showControls, setShowControls] = useState(true);
   // La imagen se prepara al abrir la vista: Chrome en Android solo permite navigator.share()
   // unos segundos después del toque, y generarla en ese momento tarda más que eso.
@@ -58,14 +51,6 @@ export default function StoryView({ slug, title, targetDate, timezone, imageUrl,
       alive = false;
     };
   }, [loadImage]);
-
-  const diff = Math.max(0, Math.floor(new Date(targetDate).getTime() / 1000) - now);
-  const ready = now > 0;
-  const ended = ready && diff === 0;
-  const days = Math.floor(diff / 86400);
-  const hours = Math.floor((diff % 86400) / 3600);
-  const minutes = Math.floor((diff % 3600) / 60);
-  const seconds = diff % 60;
 
   const fecha = new Date(targetDate).toLocaleDateString("es-MX", {
     weekday: "long",

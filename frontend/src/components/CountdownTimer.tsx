@@ -44,11 +44,13 @@ export default function CountdownTimer({
   eventTimezone,
   slug,
   storyHref,
+  actions,
 }: {
   targetDate: string;
   eventTimezone?: string;
   slug?: string;
   storyHref?: string; // vista vertical para historias (/c/<slug>/historia)
+  actions?: React.ReactNode; // botones extra junto a "Copiar enlace" (ej. Insertar)
 }) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0, ended: false });
   const [serverOffset, setServerOffset] = useState<number>(0);
@@ -185,6 +187,7 @@ export default function CountdownTimer({
             📲 Para tu historia
           </Link>
         )}
+        {actions}
       </div>
 
       {/* Fecha en hora local del visitante */}
