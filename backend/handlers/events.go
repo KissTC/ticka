@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -300,6 +301,74 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		resp["claim_token"] = *claimToken
 	}
 	return c.Status(fiber.StatusCreated).JSON(resp)
+}
+
+type AdminEventResponse struct {
+	EventResponse
+	Generic bool `json:"generic"` // comparte imagen con otros contadores (la genérica de la siembra)
+}
+
+// GET /api/admin/events?q=&category=&generic=1&offset=0 — todos los contadores próximos para el admin,
+// sin el límite de los listados públicos. generic=1 deja solo los que tienen imagen genérica: los
+// eventos sembrados usan la misma image_url por categoría, así que "genérica" = image_url compartida.
+func (h *EventHandler) AdminListEvents(c *fiber.Ctx) error {
+	if h.AdminToken == "" || c.Get("Authorization") != "Bearer "+h.AdminToken {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "No autorizado"})
+	}
+
+	const pageSize = 50
+	query := strings.TrimSpace(c.Query("q"))
+	category := c.Query("category")
+	onlyGeneric := c.Query("generic") == "1"
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+
+	rows, err := h.DB.Query(`
+		WITH shared AS (
+			SELECT image_url FROM events WHERE is_visible = true GROUP BY image_url HAVING COUNT(*) > 1
+		)
+		SELECT e.id, e.slug, e.title, e.target_date, e.image_url,
+		       COALESCE(e.thumbnail_url, e.image_url), e.views, e.created_at, e.timezone,
+		       e.category_id::text, c.slug, c.name,
+		       e.image_url IN (SELECT image_url FROM shared)
+		FROM events e
+		LEFT JOIN categories c ON e.category_id = c.id
+		WHERE e.is_visible = true AND e.target_date > NOW()
+		  AND ($1 = '' OR e.title ILIKE '%' || $1 || '%')
+		  AND ($2 = '' OR c.slug = $2)
+		  AND (NOT $3 OR e.image_url IN (SELECT image_url FROM shared))
+		ORDER BY e.target_date ASC
+		LIMIT $4 OFFSET $5
+	`, query, category, onlyGeneric, pageSize+1, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer rows.Close()
+
+	events := []AdminEventResponse{}
+	for rows.Next() {
+		var e AdminEventResponse
+		var catID, catSlug, catName sql.NullString
+		if err := rows.Scan(&e.ID, &e.Slug, &e.Title, &e.TargetDate, &e.ImageURL, &e.ThumbnailURL,
+			&e.Views, &e.CreatedAt, &e.Timezone, &catID, &catSlug, &catName, &e.Generic); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		if catID.Valid {
+			e.CategoryID = &catID.String
+			e.CategorySlug = &catSlug.String
+			e.CategoryName = &catName.String
+		}
+		events = append(events, e)
+	}
+
+	// Se pide uno de más para saber si hay otra página
+	hasMore := len(events) > pageSize
+	if hasMore {
+		events = events[:pageSize]
+	}
+	return c.JSON(fiber.Map{"events": events, "has_more": hasMore})
 }
 
 // GET /api/events

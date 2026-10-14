@@ -27,6 +27,7 @@ interface Event {
   views: number;
   category_name?: string;
   category_slug?: string;
+  generic?: boolean; // imagen compartida con otros contadores (la genérica de la siembra)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -518,6 +519,12 @@ function EventsTab({ token }: { token: string }) {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [listLoading, setListLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("");
+  const [onlyGeneric, setOnlyGeneric] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
   const [lastSlug, setLastSlug] = useState<string | null>(null);
   const [replacingSlug, setReplacingSlug] = useState<string | null>(null);
 
@@ -529,20 +536,51 @@ function EventsTab({ token }: { token: string }) {
     feedbackTimer.current = setTimeout(() => setFeedback(null), 5000);
   }, []);
 
-  const loadData = useCallback(async () => {
-    try {
-      const [catRes, evRes] = await Promise.all([
-        fetch(`${API}/api/categories`),
-        fetch(`${API}/api/events`),
-      ]);
-      const catData = await catRes.json();
-      const evData = await evRes.json();
-      setCategories(Array.isArray(catData) ? catData : []);
-      setEvents(Array.isArray(evData) ? evData : []);
-    } catch {}
+  useEffect(() => {
+    fetch(`${API}/api/categories`)
+      .then((r) => r.json())
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Todos los contadores próximos (no solo los populares), con búsqueda, categoría y "solo genérica"
+  const fetchEvents = useCallback(
+    async (offset: number) => {
+      const qs = new URLSearchParams({ q: search.trim(), category: catFilter, generic: onlyGeneric ? "1" : "0", offset: String(offset) });
+      const res = await fetch(`${API}/api/admin/events?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(res.status === 401 ? "Token inválido" : "Error al cargar contadores");
+      return (await res.json()) as { events: Event[]; has_more: boolean };
+    },
+    [token, search, catFilter, onlyGeneric]
+  );
+
+  useEffect(() => {
+    // Espera a que se deje de escribir en el buscador
+    const t = setTimeout(() => {
+      setListLoading(true);
+      fetchEvents(0)
+        .then((data) => {
+          setEvents(data.events);
+          setHasMore(data.has_more);
+        })
+        .catch((err: Error) => setTimed({ type: "error", msg: err.message }))
+        .finally(() => setListLoading(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [fetchEvents, reloadKey, setTimed]);
+
+  async function loadMore() {
+    setListLoading(true);
+    try {
+      const data = await fetchEvents(events.length);
+      setEvents((prev) => [...prev, ...data.events]);
+      setHasMore(data.has_more);
+    } catch (err: unknown) {
+      setTimed({ type: "error", msg: err instanceof Error ? err.message : "Error inesperado" });
+    } finally {
+      setListLoading(false);
+    }
+  }
 
   async function handleReplaceImage(slug: string, file: File) {
     setReplacingSlug(slug);
@@ -564,7 +602,7 @@ function EventsTab({ token }: { token: string }) {
       }
 
       setEvents((prev) => prev.map((ev) =>
-        ev.slug === slug ? { ...ev, image_url: imageUrl, thumbnail_url: thumbnailUrl } : ev
+        ev.slug === slug ? { ...ev, image_url: imageUrl, thumbnail_url: thumbnailUrl, generic: false } : ev
       ));
       setTimed({ type: "success", msg: `Imagen de "${slug}" actualizada` });
     } catch (err: unknown) {
@@ -618,7 +656,7 @@ function EventsTab({ token }: { token: string }) {
       // Resetear solo título, fecha, imagen, descripción y fuente — mantener categoría para crear varios seguidos
       setTitle(""); setTargetDate(""); setImageFile(null); setImagePreview(null);
       setDescription(""); setSourceUrl("");
-      loadData();
+      setReloadKey((k) => k + 1);
     } catch (err: unknown) {
       setTimed({ type: "error", msg: err instanceof Error ? err.message : "Error inesperado" });
     } finally {
@@ -746,12 +784,45 @@ function EventsTab({ token }: { token: string }) {
       {/* Lista de eventos recientes */}
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-bold font-outfit text-white">
-          Recientes <span className="text-gray-500 font-normal text-sm">({events.length})</span>
+          Próximos <span className="text-gray-500 font-normal text-sm">({events.length}{hasMore ? "+" : ""})</span>
         </h2>
 
-        {events.length === 0 ? (
+        <div className="flex flex-col gap-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por título…"
+            className="glass-input p-2.5 text-sm font-inter"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={catFilter}
+              onChange={(e) => setCatFilter(e.target.value)}
+              className="glass-input p-2 text-sm font-inter"
+            >
+              <option value="">Todas las categorías</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.slug}>{c.name}</option>
+              ))}
+            </select>
+            <label className="flex items-center gap-2 text-sm font-inter text-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={onlyGeneric}
+                onChange={(e) => setOnlyGeneric(e.target.checked)}
+                className="w-4 h-4 accent-cyan-500"
+              />
+              Solo con imagen genérica
+            </label>
+          </div>
+        </div>
+
+        {listLoading && events.length === 0 ? (
+          <div className="flex justify-center py-6"><Spinner /></div>
+        ) : events.length === 0 ? (
           <div className="glass-panel rounded-xl p-6 text-center text-gray-500 text-sm font-inter">
-            Sin contadores todavía
+            {onlyGeneric ? "🎉 Ningún contador próximo tiene imagen genérica" : "Sin resultados"}
           </div>
         ) : (
           <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1">
@@ -773,6 +844,11 @@ function EventsTab({ token }: { token: string }) {
                       })}
                     </span>
                     <span className="text-xs text-gray-600 font-inter">👁️ {ev.views}</span>
+                    {ev.generic ? (
+                      <span className="text-xs text-amber-300 font-inter">imagen genérica</span>
+                    ) : onlyGeneric ? (
+                      <span className="text-xs text-green-400 font-inter">✓ lista</span>
+                    ) : null}
                   </div>
                 </div>
                 <label
@@ -802,6 +878,15 @@ function EventsTab({ token }: { token: string }) {
                 </Link>
               </div>
             ))}
+            {hasMore && (
+              <button
+                onClick={loadMore}
+                disabled={listLoading}
+                className="glass-panel rounded-xl py-2.5 text-sm font-outfit text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {listLoading ? "Cargando…" : "Cargar más"}
+              </button>
+            )}
           </div>
         )}
       </div>
