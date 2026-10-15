@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-CATEGORIAS = {"deportes", "cine", "videojuegos", "conciertos"}
+CATEGORIAS = {"deportes", "cine", "videojuegos", "conciertos", "esports"}
 PRECISIONES = {"exacta", "dia"}
 CONFIANZAS = {"alta", "media"}
 HORIZONTE = timedelta(days=366)
@@ -37,6 +37,33 @@ VALUES
      %(confianza)s, %(notas)s, %(archivo_origen)s)
 ON CONFLICT (slug, fecha_dia) DO NOTHING
 """
+
+# Eventos ya publicados de la misma categoría el mismo día local: posible duplicado con otro título
+PUBLICADOS_SQL = """
+SELECT e.title
+FROM events e
+JOIN categories c ON c.id = e.category_id
+WHERE c.slug = %s AND e.is_visible = true
+  AND (e.target_date AT TIME ZONE %s)::date = %s
+"""
+
+
+def marcar_posibles_duplicados(url: str, filas: list[dict]) -> None:
+    """Agrega un aviso en `notas` si ya hay un evento publicado parecido. No bloquea la carga:
+    la decisión es del revisor. Si el usuario no puede leer `events` (ej. ticka_seeder), se omite."""
+    import psycopg
+
+    try:
+        with psycopg.connect(url) as conn, conn.cursor() as cur:
+            for fila in filas:
+                cur.execute(PUBLICADOS_SQL, (fila["categoria"], fila["zona_horaria"], fila["fecha_dia"]))
+                titulos = [t for (t,) in cur.fetchall()]
+                if titulos:
+                    aviso = "⚠ mismo día que publicado: " + " | ".join(titulos)
+                    fila["notas"] = f"{aviso}. {fila['notas']}" if fila["notas"] else aviso
+                    print(f"  ⚠ posible duplicado: {fila['titulo']}  ↔  {' | '.join(titulos)}")
+    except psycopg.Error as e:
+        print(f"  (no se pudo revisar duplicados contra events: {e.__class__.__name__})")
 
 
 def slugify(texto: str) -> str:
@@ -153,6 +180,8 @@ def main() -> int:
         return 1
 
     import psycopg  # importado aquí para que --dry-run no lo necesite
+
+    marcar_posibles_duplicados(url, validas)
 
     insertados = 0
     with psycopg.connect(url) as conn, conn.cursor() as cur:

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS staging.evento_candidato (
     id                bigserial PRIMARY KEY,
     slug              text        NOT NULL,
     titulo            text        NOT NULL,
-    categoria         text        NOT NULL CHECK (categoria IN ('deportes','cine','videojuegos','conciertos')),
+    categoria         text        NOT NULL CHECK (categoria IN ('deportes','cine','videojuegos','conciertos','esports')),
     descripcion_corta text,
     fecha_evento      timestamptz NOT NULL,
     fecha_dia         date        NOT NULL,   -- día local del evento, para deduplicar

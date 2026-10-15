@@ -46,6 +46,7 @@ CATEGORIA_NOMBRE = {
     "deportes": "Deportes",
     "videojuegos": "Videojuegos",
     "conciertos": "Conciertos",
+    "esports": "Esports",
 }
 
 

@@ -14,9 +14,17 @@ instrucción de categoría, gana este contrato.
 
 ## Alcance
 - Solo eventos desde mañana hasta 12 meses a partir de hoy.
-- Máximo 15 eventos por archivo. Prioriza los de mayor interés para público de
-  México y Latinoamérica, más los grandes eventos globales.
+- Máximo 15 eventos por archivo; **25 para videojuegos y esports** (el nicho principal
+  de Ticka). Prioriza los de mayor interés para público de México y Latinoamérica, más
+  los grandes eventos globales.
 - Sin duplicados dentro del archivo.
+- Si el orquestador te pasa una lista de eventos **ya publicados**, no los propongas
+  otra vez (aunque los escribas con otro título).
+
+## Descripción
+- `descripcion_corta`: una línea (máximo 140 caracteres) que diga **por qué importa**,
+  con un dato concreto: premio, equipos o jugadores de México/LatAm, plataformas, si es
+  secuela o regreso de algo, sede. Nada de relleno ("¡no te lo pierdas!", "muy esperado").
 
 ## Fechas y zonas horarias
 - `fecha_evento` en ISO 8601 CON offset, p. ej. `2026-12-18T20:00:00-06:00`.
@@ -52,7 +60,7 @@ Escribe SOLO JSON válido (sin markdown, sin comentarios) en:
 ```
 
 Valores permitidos:
-- `categoria`: deportes | cine | videojuegos | conciertos
+- `categoria`: deportes | cine | videojuegos | conciertos | esports
 - `precision_fecha`: exacta | dia
 - `confianza`: alta | media
 - `region`: código de país (MX, US, ES...) o `global`
