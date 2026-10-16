@@ -545,10 +545,13 @@ func (h *EventHandler) GetAnalytics(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token inválido"})
 	}
 
-	var userID string
-	err = h.DB.QueryRow(`SELECT id FROM users WHERE clerk_id = $1`, clerkID).Scan(&userID)
+	var userID, plan string
+	err = h.DB.QueryRow(`SELECT id, plan FROM users WHERE clerk_id = $1`, clerkID).Scan(&userID, &plan)
 	if err != nil {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Usuario no encontrado"})
+	}
+	if plan != "pro" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Las analytics son una función Pro", "pro_required": true})
 	}
 
 	slug := c.Params("slug")

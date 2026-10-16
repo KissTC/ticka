@@ -3,6 +3,7 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/DashboardClient";
+import { LockedAnalyticsPreview, PRO_PRICE } from "@/components/ProUpsell";
 
 interface Event {
   id: string;
@@ -47,6 +48,7 @@ export default async function DashboardPage() {
     : { events: [], profile: { plan: "free" as const, has_subscription: false } };
 
   const atLimit = profile.plan === "free" && events.length >= 3;
+  const totalViews = events.reduce((sum, e) => sum + e.views, 0);
 
   return (
     <main className="min-h-screen px-6 py-10 max-w-5xl mx-auto">
@@ -98,15 +100,30 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Banner de upgrade para usuarios Free */}
-      {profile.plan === "free" && (
+      {/* Upgrade para usuarios Free: analytics de ejemplo bloqueadas (o banner si aún no tiene contadores) */}
+      {profile.plan === "free" && events.length > 0 && (
+        <div className="mb-8 glass-panel rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-5 items-center border border-purple-500/20">
+          <div>
+            <p className="text-sm font-outfit font-semibold text-white">
+              📊 ¿De dónde vienen tus {totalViews.toLocaleString("es-MX")} {totalViews === 1 ? "visita" : "visitas"}?
+            </p>
+            <p className="text-xs text-gray-400 font-inter mt-1">
+              Con Pro ves las visitas de cada contador por día y si llegaron por WhatsApp, Instagram o X.
+              También desbloqueas video de fondo, contadores ilimitados y quitas la marca de ticka.
+            </p>
+            <p className="text-xs text-gray-500 font-inter mt-2">{PRO_PRICE} · Cancela cuando quieras</p>
+          </div>
+          <LockedAnalyticsPreview totalViews={totalViews} origen="analytics-dashboard" compact />
+        </div>
+      )}
+      {profile.plan === "free" && events.length === 0 && (
         <div className="mb-8 glass-panel rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-purple-500/20">
           <div>
             <p className="text-sm font-outfit font-semibold text-white">
               🎬 Desbloquea video de fondo y más con Pro
             </p>
             <p className="text-xs text-gray-400 font-inter mt-0.5">
-              Desde $95 MXN/mes · Cancela cuando quieras
+              {PRO_PRICE} · Cancela cuando quieras
             </p>
           </div>
           <Link

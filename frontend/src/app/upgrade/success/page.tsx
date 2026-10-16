@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import TrackProActivated from "./TrackProActivated";
 
 export const metadata: Metadata = {
   title: "¡Bienvenido a Pro! | ticka",
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
 export default function UpgradeSuccessPage() {
   return (
     <main className="min-h-screen flex flex-col justify-center items-center px-6 text-center">
+      <TrackProActivated />
       {/* Glow background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.12)_0%,transparent_70%)] pointer-events-none" />
 

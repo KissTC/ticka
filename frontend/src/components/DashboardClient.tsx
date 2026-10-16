@@ -256,6 +256,7 @@ export default function DashboardClient({
           slug={analyticsEvent.slug}
           title={analyticsEvent.title}
           totalViews={analyticsEvent.views}
+          locked={userPlan !== "pro"}
           onClose={() => setAnalyticsEvent(null)}
         />
       )}
@@ -325,8 +326,11 @@ export default function DashboardClient({
             {/* Botones de acción — aparecen en hover */}
             <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
               <button
-                onClick={() => setAnalyticsEvent(event)}
-                title="Analytics"
+                onClick={() => {
+                  setAnalyticsEvent(event);
+                  if (userPlan !== "pro") track("analytics-bloqueado", { origen: "dashboard" });
+                }}
+                title={userPlan === "pro" ? "Analytics" : "Analytics (Pro)"}
                 className="bg-black/60 hover:bg-cyan-500/80 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm transition-all backdrop-blur-sm"
               >
                 📊

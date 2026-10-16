@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { LockedAnalyticsPreview } from "@/components/ProUpsell";
 
 interface DayCount {
   date: string;
@@ -84,19 +85,23 @@ export default function AnalyticsModal({
   slug,
   title,
   totalViews,
+  locked = false,
   onClose,
 }: {
   slug: string;
   title: string;
   totalViews: number;
+  // Usuario Free: muestra datos de ejemplo bloqueados en vez de pedirlos al servidor.
+  locked?: boolean;
   onClose: () => void;
 }) {
   const { getToken } = useAuth();
   const [data, setData] = useState<Analytics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!locked);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (locked) return;
     async function load() {
       try {
         const token = await getToken();
@@ -115,7 +120,7 @@ export default function AnalyticsModal({
       }
     }
     load();
-  }, [slug, getToken]);
+  }, [slug, getToken, locked]);
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -133,6 +138,16 @@ export default function AnalyticsModal({
             ✕
           </button>
         </div>
+
+        {locked && (
+          <>
+            <div className="glass-panel rounded-xl p-4 text-center">
+              <p className="text-3xl font-extrabold font-outfit text-white">{totalViews.toLocaleString()}</p>
+              <p className="text-xs text-gray-400 font-inter mt-1">Visitas totales</p>
+            </div>
+            <LockedAnalyticsPreview totalViews={totalViews} origen="analytics-modal" />
+          </>
+        )}
 
         {loading && (
           <div className="flex justify-center py-10">

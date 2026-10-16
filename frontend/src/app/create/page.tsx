@@ -8,6 +8,7 @@ import UnsplashPicker from "@/components/UnsplashPicker";
 import { getAttribution } from "@/lib/attribution";
 import { track } from "@/lib/analytics";
 import { captureVideoFrame } from "@/lib/videoFrame";
+import { ProLimitCard } from "@/components/ProUpsell";
 
 interface Category {
   id: string;
@@ -36,6 +37,8 @@ export default function CreateEventPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Usuario Free con 3 contadores activos: en vez del formulario se muestra el aviso de Pro.
+  const [atLimit, setAtLimit] = useState(false);
 
   useEffect(() => {
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -43,6 +46,28 @@ export default function CreateEventPage() {
       setAllTimezones((Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf("timeZone"));
     }
   }, []);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    getToken().then(async (token) => {
+      if (!token || cancelled) return;
+      const headers = { Authorization: `Bearer ${token}` };
+      try {
+        const [meRes, eventsRes] = await Promise.all([
+          fetch("/api/proxy/api/users/me", { headers }),
+          fetch("/api/proxy/api/users/me/events", { headers }),
+        ]);
+        if (!meRes.ok || !eventsRes.ok) return;
+        const [me, events] = await Promise.all([meRes.json(), eventsRes.json()]);
+        if (!cancelled && me.plan !== "pro" && Array.isArray(events) && events.length >= 3) {
+          setAtLimit(true);
+          track("limite-alcanzado", { origen: "crear" });
+        }
+      } catch {}
+    });
+    return () => { cancelled = true; };
+  }, [isSignedIn, getToken]);
 
   useEffect(() => {
     fetch("/api/proxy/api/categories")
@@ -190,6 +215,12 @@ export default function CreateEventPage() {
             err.error || "Alcanzaste el límite de contadores por hora. Espera una hora e inténtalo de nuevo."
           );
         }
+        if (eventRes.status === 403 && isSignedIn && /límite de 3/.test(err.error || "")) {
+          setAtLimit(true);
+          setLoading(false);
+          track("limite-alcanzado", { origen: "crear-enviar" });
+          return;
+        }
         throw new Error(err.error || "No se pudo registrar la cuenta regresiva.");
       }
 
@@ -248,6 +279,9 @@ export default function CreateEventPage() {
         ))}
       </div>
 
+      {atLimit ? (
+        <ProLimitCard origen="limite-crear" />
+      ) : (
       <form onSubmit={handleSubmit} className="glass-panel w-full rounded-2xl p-8 flex flex-col gap-6 relative">
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-4 rounded-xl font-inter">
@@ -476,6 +510,7 @@ export default function CreateEventPage() {
           .
         </p>
       </form>
+      )}
     </main>
   );
 }
